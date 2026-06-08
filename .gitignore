@@ -1,0 +1,10 @@
+
+*.bak
+
+*.rxw64
+
+/src/slprj/
+
+/src/MSE_PLANT_sldrt_win64/
+
+/src/MSE_PLANT.slxc
