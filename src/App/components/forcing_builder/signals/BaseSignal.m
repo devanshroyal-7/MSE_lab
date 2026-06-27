@@ -9,10 +9,10 @@ classdef (Abstract) BaseSignal < handle
     end
 
     properties
-        Offset      = 0;
-        DelayBefore = 0;
-        DelayAfter  = 0;
-        Repeat      = 0;
+        Offset      = 0
+        DelayBefore = 0
+        DelayAfter  = 0
+        Repeat      = 1
     end
 
     methods (Abstract)
