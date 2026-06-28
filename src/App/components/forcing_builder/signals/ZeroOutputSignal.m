@@ -1,4 +1,4 @@
-classdef ZeroOutput < BaseSignal
+classdef ZeroOutputSignal < BaseSignal
     % zero output signal for steady state analysis
 
     properties
