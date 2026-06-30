@@ -6,10 +6,12 @@ classdef RampSignal < BaseSignal
         Duration    % [s]
         SampleRate  % [Hz]
         Slope       % [N/s]
-        DwellTime   % [Hz]
-        DwellTimeLoc    {mustBeMember(DwellTimeLoc, {"beginning", "end"})} = beginning
-        TwoSided        {MustBeA(TwoSided, 'logical')} = false
-        Mirrored        {MustBeA(Mirrored, 'logical')} = false
+        DwellTime   % [s]
+        DwellTimeLoc    {mustBeMember(DwellTimeLoc, ["beginning", "end"])} = "beginning"
+        TwoSided    (1,1) logical = false
+        Mirrored    (1,1) logical = false
+        TotalTime   % [s]
+        TotalTimeVec
     end
 
     methods
@@ -31,10 +33,56 @@ classdef RampSignal < BaseSignal
             obj.TwoSided = twosided;
             obj.Mirrored = mirrored;
             obj.SampleRate = smp_rate;
+            obj.TotalTime = obj.Duration;
+            obj.TotalTimeVec = obj.updateTimeline();
+        end
+
+        function obj = updateTimeline(obj)
+            num_legs = 1;
+
+            if obj.TwoSided, num_legs = num_legs*2; end
+            if obj.Mirrored, num_legs = num_legs*2; end
+
+            obj.TotalTime = (num_legs * obj.Duration) + obj.DwellTime;
+
+            dt = 1/obj.SampleRate;
+            obj.TotalTimeVec = 0:dt:obj.TotalTime;
         end
 
         function y = evaluate(obj, t)
-            y = obj.Amplitude * sin(2 * pi * obj.Frequency * t + deg2rad(obj.InitPhase));
+            obj = obj.updateTimeline();
+
+            t = obj.TotalTimeVec;
+            y = zeros(size(t));
+            L = obj.Duration;
+
+            if obj.DwellTimeLoc == "beginning"
+                t_rel = t - obj.DwellTime;
+            else
+                t_rel = t;
+            end
+
+            idx1 = (t_rel > 0) & (t_rel < L);
+            y(idx1) = t_rel(idx1) * obj.Slope;
+
+            if obj.TwoSided
+                idx2 = (t_rel >= L) & (t_rel < 2*L);
+                y(idx2) = (2*L - t_rel(idx2)) * obj.Slope;
+            end
+
+            if obj.Mirrored
+                if obj.TwoSided
+                    idx3 = (t_rel >= 2*L) & (t_rel < 3*L);
+                    idx4 = (t_rel >= 3*L) & (t_rel < 4*L);
+
+                    y(idx3) = (2*L - t_rel(idx3)) * obj.Slope;
+                    y(idx4) = (t_rel(idx4) - 4*L) * obj.Slope;
+                else
+                    idx3 = (t_rel >= L) & (t_rel < 2*L);
+                    
+                    y(idx3) = - (t_rel(idx3) - L) * obj.Slope;
+                end
+            end
 
             if obj.Offset ~= 0
                 y = y + obj.Offset;
