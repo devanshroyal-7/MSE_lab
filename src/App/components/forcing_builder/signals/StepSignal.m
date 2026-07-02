@@ -2,34 +2,37 @@ classdef StepSignal < BaseSignal
     % Subclass for Step Signal
 
     properties
-        Name = "Zero Output"
-        Duration    % [s]
-        SampleRate  % [Hz]
+        Name = "Step Signal"
         Magnitude   % [N]
         OffTime = 1 % [s]
         OnTime  = 1 % [s]
     end
 
+    properties (Dependent)
+        TotalDuration
+    end
+
     methods
-        function obj = StepSignal (magnitude, on_time, off_time, smp_rate)
+        function obj = StepSignal (magnitude, on_time, off_time)
             % default values
             if nargin < 1, magnitude = 1.0; end
             if nargin < 2, on_time  = 1.0; end
             if nargin < 3, off_time = 1.0; end
-            if nargin < 4, smp_rate = 1000; end
 
             % assignment
             obj.Magnitude = magnitude;
             obj.OnTime = on_time;
             obj.OffTime = off_time;
-            obj.SampleRate = smp_rate;
-            obj.Duration = obj.OnTime + obj.OffTime;
+        end
+
+        function td = get.TotalDuration(obj)
+            td = obj.OffTime + obj.OnTime;
         end
 
         function y = evaluate(obj, t)
             y = zeros(size(t)); 
 
-            stepCondition = (t >= obj.OffTime);
+            stepCondition = (t >= obj.OffTime) & (t <= obj.TotalDuration);
             y(stepCondition) = obj.Magnitude;
             
             % offset (must verify if it was done globally)
