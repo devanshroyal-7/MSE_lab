@@ -8,7 +8,7 @@ classdef RampSignal < BaseSignal
         DwellTime   % [s]
         DwellTimeLoc    {mustBeMember(DwellTimeLoc, ["beginning", "end"])} = "beginning"
         TwoSided    (1,1) logical = false
-        Mirrored    (1,1) logical = falseend
+        Mirrored    (1,1) logical = false
     end
 
     properties (Dependent)
