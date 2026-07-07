@@ -1,11 +1,8 @@
 classdef (Abstract) BaseSignal < handle
-    % Base signal template for all signal that will be used in
-    % SignalBuilderModel.m
+    % Subclass for Sine Signal
 
     properties (Abstract)
         Name        % string: Display name for the "Overall" function
-        Duration    % double: Base running time [s]
-        SampleRate  % double: Frequency         [Hz]
     end
 
     properties
