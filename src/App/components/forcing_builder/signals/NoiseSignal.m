@@ -1,5 +1,5 @@
 classdef NoiseSignal < BaseSignal
-    % Subclass for Sine Signal
+    % Subclass for Noise Signal
 
     properties
         Name = "Noise"

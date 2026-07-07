@@ -1,5 +1,5 @@
 classdef SweptSineSignal < BaseSignal
-    % Subclass for Sine Signal
+    % Subclass for Swept Sine Signal for modal analysis
 
     properties
         Name = "Swept Sine"
