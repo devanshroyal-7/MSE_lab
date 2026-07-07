@@ -1,4 +1,4 @@
-classdef signal_selected_exported < matlab.ui.componentcontainer.ComponentContainer
+classdef SignalBuilderView < matlab.ui.componentcontainer.ComponentContainer
 
     % Properties that correspond to underlying components
     properties (Access = private, Transient, NonCopyable)
