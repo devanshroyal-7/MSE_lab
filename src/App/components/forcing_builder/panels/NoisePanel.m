@@ -2,8 +2,8 @@ classdef NoisePanel < handle
     properties
         MainLayoutGrid
         AmpEditField
-        StartFreqEditField
-        EndFreqEditField
+        LowerFreqEditField
+        UpperFreqEditField
         DurationEditField
         SeedEditField
     end
@@ -20,10 +20,10 @@ classdef NoisePanel < handle
             obj.AmpEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Start Frequency (Hz):');
-            obj.StartFreqEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
+            obj.LowerFreqEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
 
             uilabel(obj.MainLayoutGrid, 'Text', 'End Frequency (Hz):');
-            obj.EndFreqEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 10.0);
+            obj.UpperFreqEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 10.0);
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Duration (s):');
             obj.DurationEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 10.0);
