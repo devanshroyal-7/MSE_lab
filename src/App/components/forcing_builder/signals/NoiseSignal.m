@@ -15,18 +15,18 @@ classdef NoiseSignal < BaseSignal
     end
 
     methods
-        function obj = NoiseSignal (amplitude, start_freq, end_freq, duration, seed)
+        function obj = NoiseSignal (amplitude, lower_freq, upper_freq, duration, seed)
             % default values
             if nargin < 1, amplitude    = 1.0;  end
-            if nargin < 2, start_freq   = 1.0;  end
-            if nargin < 3, end_freq     = 0.0;  end
+            if nargin < 2, lower_freq   = 1.0;  end
+            if nargin < 3, upper_freq     = 0.0;  end
             if nargin < 4, duration     = 10.0; end
             if nargin < 5, seed         = 42;   end
 
             % assignment
             obj.Amplitude = amplitude;
-            obj.LowerFrequency = start_freq;
-            obj.UpperFrequency = end_freq;
+            obj.LowerFrequency = lower_freq;
+            obj.UpperFrequency = upper_freq;
             obj.Duration = duration;
             obj.Seed = seed;
         end
