@@ -11,7 +11,7 @@ classdef StepPanel < handle
             % Construct the programmatic parameters layout grid
             obj.MainLayoutGrid = uigridlayout(parentContainer, [3, 2]);
             obj.MainLayoutGrid.RowHeight = {30, 30, 30};
-            obj.MainLayoutGrid.ColumnWidth = {100, '1x'};
+            obj.MainLayoutGrid.ColumnWidth = {130, '1x'};
 
             % Render standard fields
             uilabel(obj.MainLayoutGrid, 'Text', 'Magnitude (N):');
