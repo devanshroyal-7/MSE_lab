@@ -14,42 +14,58 @@ classdef SignalBuilderView2 < handle
 
     methods
         function obj = SignalBuilderView2(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 3]);
-            obj.MainLayoutGrid.RowHeight = {300, 300};
-            obj.MainLayoutGrid.ColumnWidth = {300, 300, 300};
-            
-            % Forcing Function Plot Panel
-            obj.PlotPanel = uipanel(obj.MainLayoutGrid, ...
-                "Title", "Function Plot", "FontWeight", "bold");
-            obj.PlotPanel.Layout.Row = 1;
-            obj.PlotPanel.Layout.Column = [1, 3];
+		obj.createComponents(parentContainer)
+		obj.layoutComponents()
+	end
+    end
 
-            plotGrid = uigridlayout(obj.PlotPanel, [1, 1]);
-            plotGrid.Padding = [10, 10, 10, 10];
+    methods (Access = private)
+	    function createComponents(obj, parentContainer)
+	    
+		obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 3]); 
+		obj.MainLayoutGrid.RowHeight = {300, 300}; 
+		obj.MainLayoutGrid.ColumnWidth = {300, 300, 300};
+		
+		% Forcing Function Plot Panel
+		obj.PlotPanel = uipanel(obj.MainLayoutGrid, ...
+		"Title", "Function Plot", "FontWeight", "bold");
 
-            obj.Plot = uiaxes(plotGrid);
+		plotGrid = uigridlayout(obj.PlotPanel, [1, 1]);
+		plotGrid.Padding = [10, 10, 10, 10];
+		obj.Plot = uiaxes(plotGrid);
 
-            % Overall List Panel
-            obj.OverallPanel = uipanel(obj.MainLayoutGrid, ...
-                "Title", "Select Functions", "FontWeight", "bold");
-            obj.OverallPanel.Layout.Row = 2;
-            obj.OverallPanel.Layout.Column = 1;
+		% Overall List Panel
+		obj.OverallPanel = uipanel(obj.MainLayoutGrid, ...
+		"Title", "Select Functions", "FontWeight", "bold");
 
-            % Function Setup Panel
-            obj.ForcingPanel = uipanel(obj.MainLayoutGrid, ...
-                "Title", "Function Setup", "FontWeight", "bold");
-            obj.ForcingPanel.Layout.Row = 2;
-            obj.ForcingPanel.Layout.Column = 2;
 
-            obj.FunctionSetup = CustomPanel(obj.ForcingPanel);
+		% Function Setup Panel
+		obj.ForcingPanel = uipanel(obj.MainLayoutGrid, ...
+		"Title", "Function Setup", "FontWeight", "bold");
+	    
 
-            % Additional Parameter Panel
-            obj.AdditionalPanel = uipanel(obj.MainLayoutGrid, ...
+		obj.FunctionSetup = CustomPanel(obj.ForcingPanel);
+
+		% Additional Parameter Panel
+		obj.AdditionalPanel = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Additional Parameters", "FontWeight", "bold");
-            obj.AdditionalPanel.Layout.Row = 2;
-            obj.AdditionalPanel.Layout.Column = 3;
-        end
+	    end
+	    
+	    function layoutComponents(obj)
+		    
+		    obj.PlotPanel.Layout.Row = 1;
+		    obj.PlotPanel.Layout.Column = [1, 3];
+
+		    obj.OverallPanel.Layout.Row = 2;
+		    obj.OverallPanel.Layout.Column = 1;
+
+		    obj.ForcingPanel.Layout.Row = 2;
+		    obj.ForcingPanel.Layout.Column = 2;
+
+		    obj.AdditionalPanel.Layout.Row = 2;
+		    obj.AdditionalPanel.Layout.Column = 3;
+
+	    end
     end
 end
-
 
