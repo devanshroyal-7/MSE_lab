@@ -1,71 +1,76 @@
-classdef SignalBuilderView2 < handle
+classdef SignalBuilderView < handle
     % Use grid size 940 x 630
 
     properties
         MainLayoutGrid
         PlotPanel
         Plot
-        OverallPanel
+        PanelOverall
         OverallListWidget
-        ForcingPanel
+        PanelForcing
         FunctionSetup
-        AdditionalPanel
+        PanelAdditional
+        AdditionalSetup
     end
 
     methods
-        function obj = SignalBuilderView2(parentContainer)
-		obj.createComponents(parentContainer)
-		obj.layoutComponents()
-	end
+        function obj = SignalBuilderView(parentContainer)
+    		obj.createComponents(parentContainer)
+    		obj.layoutComponents()
+    	end
     end
 
     methods (Access = private)
-	    function createComponents(obj, parentContainer)
-	    
-		obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 3]); 
-		obj.MainLayoutGrid.RowHeight = {300, 300}; 
-		obj.MainLayoutGrid.ColumnWidth = {300, 300, 300};
-		
-		% Forcing Function Plot Panel
-		obj.PlotPanel = uipanel(obj.MainLayoutGrid, ...
-		"Title", "Function Plot", "FontWeight", "bold");
+        function createComponents(obj, parentContainer)
 
-		plotGrid = uigridlayout(obj.PlotPanel, [1, 1]);
-		plotGrid.Padding = [10, 10, 10, 10];
-		obj.Plot = uiaxes(plotGrid);
+    		obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 3]);
+    		obj.MainLayoutGrid.RowHeight = {300, 300};
+    		obj.MainLayoutGrid.ColumnWidth = {300, 300, 300};
 
-		% Overall List Panel
-		obj.OverallPanel = uipanel(obj.MainLayoutGrid, ...
-		"Title", "Select Functions", "FontWeight", "bold");
+    		% Forcing Function Plot Panel
+    		obj.PlotPanel = uipanel(obj.MainLayoutGrid, ...
+        		"Title", "Function Plot", "FontWeight", "bold");
+
+    		plotGrid = uigridlayout(obj.PlotPanel, [1, 1]);
+    		plotGrid.Padding = [10, 10, 10, 10];
+    		obj.Plot = uiaxes(plotGrid, "XGrid", "on", "YGrid", "on");
+
+    		% Overall List Panel
+    		obj.PanelOverall = uipanel(obj.MainLayoutGrid, ...
+        		"Title", "Select Functions", "FontWeight", "bold");
+
+            obj.OverallListWidget = OverallPanel(obj.PanelOverall);
 
 
-		% Function Setup Panel
-		obj.ForcingPanel = uipanel(obj.MainLayoutGrid, ...
-		"Title", "Function Setup", "FontWeight", "bold");
-	    
+    		% Function Setup Panel
+    		obj.PanelForcing = uipanel(obj.MainLayoutGrid, ...
+        		"Title", "Function Setup", "FontWeight", "bold");
 
-		obj.FunctionSetup = CustomPanel(obj.ForcingPanel);
 
-		% Additional Parameter Panel
-		obj.AdditionalPanel = uipanel(obj.MainLayoutGrid, ...
+    		obj.FunctionSetup = CustomPanel(obj.PanelForcing);
+
+    		% Additional Parameter Panel
+    		obj.PanelAdditional = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Additional Parameters", "FontWeight", "bold");
-	    end
-	    
-	    function layoutComponents(obj)
-		    
-		    obj.PlotPanel.Layout.Row = 1;
-		    obj.PlotPanel.Layout.Column = [1, 3];
 
-		    obj.OverallPanel.Layout.Row = 2;
-		    obj.OverallPanel.Layout.Column = 1;
+            obj.AdditionalSetup = AdditionalPanel(obj.PanelAdditional);
+        end
 
-		    obj.ForcingPanel.Layout.Row = 2;
-		    obj.ForcingPanel.Layout.Column = 2;
+        function layoutComponents(obj)
 
-		    obj.AdditionalPanel.Layout.Row = 2;
-		    obj.AdditionalPanel.Layout.Column = 3;
+            obj.PlotPanel.Layout.Row = 1;
+            obj.PlotPanel.Layout.Column = [1, 3];
 
-	    end
+            obj.PanelOverall.Layout.Row = 2;
+            obj.PanelOverall.Layout.Column = 1;
+
+            obj.PanelForcing.Layout.Row = 2;
+            obj.PanelForcing.Layout.Column = 2;
+
+            obj.PanelAdditional.Layout.Row = 2;
+            obj.PanelAdditional.Layout.Column = 3;
+
+        end
     end
 end
 
