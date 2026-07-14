@@ -38,7 +38,7 @@ classdef NoiseSignal < BaseSignal
         function y = evaluate(obj, t)
             y = zeros(size(t));
 
-            activeMask = (t >= 0) & (t < obj.Duration);
+            activeMask = (t >= 0) & (t <= obj.Duration);
             t_active = t(activeMask);
 
             if isempty(t_active) || length(t_active) < 4    % 4 for frequency domain mirroring

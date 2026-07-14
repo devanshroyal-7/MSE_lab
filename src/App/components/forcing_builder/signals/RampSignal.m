@@ -53,11 +53,11 @@ classdef RampSignal < BaseSignal
                 t_rel = t;
             end
 
-            idx1 = (t_rel > 0) & (t_rel < L);
+            idx1 = (t_rel >= 0) & (t_rel <= L);
             y(idx1) = t_rel(idx1) * obj.Slope;
 
             if obj.TwoSided
-                idx2 = (t_rel >= L) & (t_rel < 2*L);
+                idx2 = (t_rel >= L) & (t_rel <= 2*L);
                 y(idx2) = (2*L - t_rel(idx2)) * obj.Slope;
             end
 

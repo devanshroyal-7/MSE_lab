@@ -29,7 +29,7 @@ classdef CustomSignal < BaseSignal
         function y = evaluate(obj, t)
             y = zeros(size(t));
 
-            activeMask = (t >= 0) & (t < obj.Duration);
+            activeMask = (t >= 0) & (t <= obj.Duration);
             t_active = t(activeMask);
 
             try
