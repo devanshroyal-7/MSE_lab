@@ -26,7 +26,7 @@ classdef RampPanel < handle
             uilabel(obj.MainLayoutGrid, 'Text', 'Dwell Time (s):');
             obj.DwellTimeEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0);
 
-            uilabel(obj.MainLayoutGrid, 'Text', 'Dwell Time Location:')
+            uilabel(obj.MainLayoutGrid, 'Text', 'Dwell Time Location:');
             obj.DwellLocSwitch = uiswitch(obj.MainLayoutGrid, "Items", ["beginning", "end"]);
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Twosided:');
