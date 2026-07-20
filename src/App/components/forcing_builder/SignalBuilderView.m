@@ -8,9 +8,21 @@ classdef SignalBuilderView < handle
         PanelOverall
         OverallListWidget
         PanelForcing
-        FunctionSetup
+        ActiveSetupPanel
+        ForcingCanvas
         PanelAdditional
         AdditionalSetup
+
+        % View Callback functions % these callbacks pass it from overall panel to
+        % the SignalBuilderController
+        AddCallbackView
+        RemoveCallbackView
+        SelectAvailableCallbackView
+        SelectOverallCallbackView
+    end
+
+    events
+        ViewUpdated
     end
 
     methods
@@ -41,13 +53,21 @@ classdef SignalBuilderView < handle
 
             obj.OverallListWidget = OverallPanel(obj.PanelOverall);
 
+            obj.OverallListWidget.AddCallback = @(value) obj.fwdAddCallback(value);
+            obj.OverallListWidget.RemoveCallback = @(idx) obj.fwdRemoveCallback(idx);
+            obj.OverallListWidget.SelectAvailableCallback = @(value) obj.fwdSelectAvailableCallback(value);
+            obj.OverallListWidget.SelectOverallCallback = @(idx) obj.fwdSelectOverallCallback(idx);
+
 
     		% Function Setup Panel
     		obj.PanelForcing = uipanel(obj.MainLayoutGrid, ...
         		"Title", "Function Setup", "FontWeight", "bold");
 
+            obj.ForcingCanvas  = uigridlayout(obj.PanelForcing, [1, 1]);
+            obj.ForcingCanvas.Padding = [0, 0, 0, 0];
 
-    		obj.FunctionSetup = CustomPanel(obj.PanelForcing);
+            obj.swapActivePanel("Custom");      % Initialize with Custom
+
 
     		% Additional Parameter Panel
     		obj.PanelAdditional = uipanel(obj.MainLayoutGrid, ...
@@ -69,7 +89,65 @@ classdef SignalBuilderView < handle
 
             obj.PanelAdditional.Layout.Row = 2;
             obj.PanelAdditional.Layout.Column = 3;
+        end
+    end
 
+    methods
+        function updatePlot(obj, t, y)
+            plot(obj.Plot, t, y);
+        end
+
+        function swapActivePanel(obj, panelName)
+            if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
+                delete(obj.ActiveSetupPanel.MainLayoutGrid);
+                obj.ActiveSetupPanel = [];
+            end
+
+            switch panelName
+                case "Custom"
+                    obj.ActiveSetupPanel = CustomPanel(obj.ForcingCanvas);
+                case "Noise"
+                    obj.ActiveSetupPanel = NoisePanel(obj.ForcingCanvas);
+                case "Ramp"
+                    obj.ActiveSetupPanel = RampPanel(obj.ForcingCanvas);
+                case "Sine"
+                    obj.ActiveSetupPanel = SinePanel(obj.ForcingCanvas);
+                case "Step"
+                    obj.ActiveSetupPanel = StepPanel(obj.ForcingCanvas);
+                case "Swept Sine"
+                    obj.ActiveSetupPanel = SweptSinePanel(obj.ForcingCanvas);
+                case "Zero Output"
+                    obj.ActiveSetupPanel = ZeroOutputPanel(obj.ForcingCanvas);
+            end
+        end
+    end
+
+    methods
+        % methods for forwarding the callback function from view to
+        % controller
+
+        function fwdAddCallback(obj, value)
+            if ~isempty(obj.AddCallbackView)
+                obj.AddCallbackView(value);
+            end
+        end
+
+        function fwdRemoveCallback(obj, idx)
+            if ~isempty(obj.RemoveCallbackView)
+                obj.RemoveCallbackView(idx);
+            end
+        end
+
+        function fwdSelectAvailableCallback(obj, value)
+            if ~isempty(obj.SelectAvailableCallbackView)
+                obj.SelectAvailableCallbackView(value);
+            end
+        end
+
+        function fwdSelectOverallCallback(obj, idx)
+            if ~isempty(obj.SelectOverallCallbackView)
+                obj.SelectOverallCallbackView(idx);
+            end
         end
     end
 end

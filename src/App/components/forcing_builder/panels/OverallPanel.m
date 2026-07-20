@@ -10,6 +10,12 @@ classdef OverallPanel < handle
         RemoveButton
         ViewLabel
         ViewSwitch
+
+        % Callback function handles
+        AddCallback
+        RemoveCallback
+        SelectAvailableCallback
+        SelectOverallCallback
     end
 
     methods
@@ -37,6 +43,11 @@ classdef OverallPanel < handle
             obj.ViewSwitch = uiswitch(obj.MainLayoutGrid, "Items", ["Single", "Overall"]);
 
             obj.layoutComponent();
+
+            obj.AddButton.ButtonPushedFcn = @(~, ~) obj.handleAddPushed;
+            obj.RemoveButton.ButtonPushedFcn = @(~, ~) obj.handleRemovePushed;
+            obj.AvailableListBox.ClickedFcn = @(~, ~) obj.handleSelectAvailableListBox;
+            obj.OverallListBox.ClickedFcn = @(~, ~) obj.handleSelectOverallListBox;
         end
 
         function layoutComponent(obj)
@@ -66,6 +77,34 @@ classdef OverallPanel < handle
 
             obj.ViewSwitch.Layout.Row = 4;
             obj.ViewSwitch.Layout.Column = [1, 2];
+        end
+
+        function handleAddPushed(obj)
+            if ~isempty(obj.AddCallback)
+                selectedSignal = obj.AvailableListBox.Value;
+                obj.AddCallback(selectedSignal);
+            end
+        end
+
+        function handleRemovePushed(obj)
+            if ~isempty(obj.RemoveCallback)
+                selectedSignal = obj.OverallListBox.ValueIndex;
+                obj.RemoveCallback(selectedSignal);
+            end
+        end
+
+        function handleSelectAvailableListBox(obj)
+            if ~isempty(obj.SelectAvailableCallback)
+                selectedSignal = obj.AvailableListBox.Value;
+                obj.SelectAvailableCallback(selectedSignal);
+            end
+        end
+
+        function handleSelectOverallListBox(obj)
+            if ~isempty(obj.SelectOverallCallback)
+                selectedSignal = obj.OverallListBox.ValueIndex;
+                obj.SelectOverallCallback(selectedSignal);
+            end
         end
     end
 end
