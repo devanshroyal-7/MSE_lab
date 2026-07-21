@@ -15,8 +15,8 @@ classdef SignalBuilderController < handle
             obj.ModelListeners = addlistener(obj.Model, 'DataUpdated', @(~, ~) obj.handleModelUpdated);
             % obj.ViewListeners = addlistener(obj.View, 'ViewUpdated', @(~, ~) obj.handleViewUpdated);
 
-            obj.View.AddSignalCallbackView = @(value) obj.handleAddCallback(value);
-            obj.View.RemoveSignalCallbackView = @(idx) obj.handleRemoveCallback(idx);
+            obj.View.AddCallbackView = @(value) obj.handleAddCallback(value);
+            obj.View.RemoveCallbackView = @(idx) obj.handleRemoveCallback(idx);
             obj.View.SelectAvailableCallbackView = @(value) obj.handleSelectAvailableCallback(value);
             obj.View.SelectOverallCallbackView = @(idx) obj.handleSelectOverallCallback(idx);
         end
@@ -32,9 +32,20 @@ classdef SignalBuilderController < handle
             
             viewMode = obj.View.OverallListWidget.ViewSwitch.Value;
 
+            if isempty(obj.Model.Signals)
+                obj.View.updatePlot([], []);
+                return;
+            end
+
             % re-evaluate total signals and time
             if strcmp(viewMode, 'Single')
                 selectedSigIdx = obj.View.OverallListWidget.OverallListBox.ValueIndex;
+                
+                if isempty(selectedSigIdx) || selectedSigIdx < 1 || selectedSigIdx > length(obj.Model.Signals)
+                    selectedSigIdx = 1;
+                    obj.View.OverallListWidget.OverallListBox.ValueIndex = 1;
+                end
+
                 [t, y] = obj.Model.evaluateIndividualSignal(selectedSigIdx);
             else
                 [t, y] = obj.Model.compileCompositeSignal();
@@ -51,8 +62,7 @@ classdef SignalBuilderController < handle
     
                     obj.Model.addSignal(CustomSignal(equation, duration));
                     
-                    % command line version of updating the overallListbox: 
-                    % view.OverallListWidget.OverallListBox.Items = [view.OverallListWidget.OverallListBox.Items, view.OverallListWidget.AvailableListBox.Value]
+                    
             end
 
         end
@@ -61,8 +71,8 @@ classdef SignalBuilderController < handle
 
         end
 
-        function handleSelectAvailableCallback(obj, idx)
-
+        function handleSelectAvailableCallback(obj, value)
+            obj.View.swapActivePanel(value)
         end
 
         function handleSelectOverallCallback(obj, idx)

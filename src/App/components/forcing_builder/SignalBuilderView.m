@@ -98,6 +98,8 @@ classdef SignalBuilderView < handle
         end
 
         function swapActivePanel(obj, panelName)
+            panelName = string(panelName);
+
             if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
                 delete(obj.ActiveSetupPanel.MainLayoutGrid);
                 obj.ActiveSetupPanel = [];
