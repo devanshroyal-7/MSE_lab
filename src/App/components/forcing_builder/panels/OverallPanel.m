@@ -46,7 +46,7 @@ classdef OverallPanel < handle
 
             obj.AddButton.ButtonPushedFcn = @(~, ~) obj.handleAddPushed;
             obj.RemoveButton.ButtonPushedFcn = @(~, ~) obj.handleRemovePushed;
-            obj.AvailableListBox.ClickedFcn = @(~, ~) obj.handleSelectAvailableListBox;
+            obj.AvailableListBox.ValueChangedFcn = @(src, event) obj.handleSelectAvailableListBox(src, event);
             obj.OverallListBox.ClickedFcn = @(~, ~) obj.handleSelectOverallListBox;
         end
 
@@ -93,9 +93,9 @@ classdef OverallPanel < handle
             end
         end
 
-        function handleSelectAvailableListBox(obj)
+        function handleSelectAvailableListBox(obj, ~, event)
             if ~isempty(obj.SelectAvailableCallback)
-                selectedSignal = obj.AvailableListBox.Value;
+                selectedSignal = string(event.Value);
                 obj.SelectAvailableCallback(selectedSignal);
             end
         end
