@@ -30,7 +30,7 @@ classdef OverallPanel < handle
 
             obj.AvailableListBox = uilistbox(obj.MainLayoutGrid, "Items", ["Custom", "Noise", "Ramp", "Sine", "Step", "Swept Sine", "Zero Output"]);
 
-            obj.OverallListBox = uilistbox(obj.MainLayoutGrid, "Items", "");
+            obj.OverallListBox = uilistbox(obj.MainLayoutGrid, "Items", string.empty);
 
             obj.AddButton = uibutton(obj.MainLayoutGrid, "Text", "Add");
 
