@@ -1,5 +1,5 @@
 classdef CustomSignal < BaseSignal
-    % Subclass for Noise Signal
+    % Subclass for Custom Signal
 
     properties
         Name = "Custom"
