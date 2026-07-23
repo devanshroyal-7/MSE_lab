@@ -9,6 +9,7 @@ classdef SignalBuilderView < handle
         OverallListWidget
         PanelForcing
         ActiveSetupPanel
+        ActivePanelName
         ForcingCanvas
         PanelAdditional
         AdditionalSetup
@@ -56,7 +57,7 @@ classdef SignalBuilderView < handle
             obj.OverallListWidget.AddCallback = @(value) obj.fwdAddCallback(value);
             obj.OverallListWidget.RemoveCallback = @(idx) obj.fwdRemoveCallback(idx);
             obj.OverallListWidget.SelectAvailableCallback = @(value) obj.fwdSelectAvailableCallback(value);
-            obj.OverallListWidget.SelectOverallCallback = @(idx) obj.fwdSelectOverallCallback(idx);
+            obj.OverallListWidget.SelectOverallCallback = @(idx, swapFlag) obj.fwdSelectOverallCallback(idx, swapFlag);
 
 
     		% Function Setup Panel
@@ -121,6 +122,26 @@ classdef SignalBuilderView < handle
                 case "Zero Output"
                     obj.ActiveSetupPanel = ZeroOutputPanel(obj.ForcingCanvas);
             end
+
+            obj.ActivePanelName = panelName;
+        end
+
+        function signal = getActiveSignal(obj)
+            signal = [];
+
+            if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
+                if ismethod(obj.ActiveSetupPanel, 'createSignal')
+                    signal = obj.ActiveSetupPanel.createSignal();
+                end
+            end
+        end
+
+        function populateActivePanel(obj, signalObj)
+            if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
+                if ismethod(obj.ActiveSetupPanel, 'populate')
+                    obj.ActiveSetupPanel.populate(signalObj);
+                end
+            end
         end
     end
 
@@ -146,9 +167,9 @@ classdef SignalBuilderView < handle
             end
         end
 
-        function fwdSelectOverallCallback(obj, idx)
+        function fwdSelectOverallCallback(obj, idx, swapFlag)
             if ~isempty(obj.SelectOverallCallbackView)
-                obj.SelectOverallCallbackView(idx);
+                obj.SelectOverallCallbackView(idx, swapFlag);
             end
         end
     end

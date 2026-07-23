@@ -18,7 +18,7 @@ classdef SignalBuilderController < handle
             obj.View.AddCallbackView = @(value) obj.handleAddCallback(value);
             obj.View.RemoveCallbackView = @(idx) obj.handleRemoveCallback(idx);
             obj.View.SelectAvailableCallbackView = @(value) obj.handleSelectAvailableCallback(value);
-            obj.View.SelectOverallCallbackView = @(idx) obj.handleSelectOverallCallback(idx);
+            obj.View.SelectOverallCallbackView = @(idx, swapFlag) obj.handleSelectOverallCallback(idx, swapFlag);
         end
 
         function syncViewToModel(obj)
@@ -55,28 +55,33 @@ classdef SignalBuilderController < handle
         end
 
         function handleAddCallback(obj, selectedSignal)
-            switch selectedSignal
-                case 'Custom'
-                    equation = obj.View.ActiveSetupPanel.CustomEditField.Value;
-                    duration = obj.View.ActiveSetupPanel.DurationEditField.Value;
-    
-                    obj.Model.addSignal(CustomSignal(equation, duration));
-                    
-                    
-            end
+            newSignal = obj.View.getActiveSignal();
 
+            if obj.View.ActivePanelName ~= string(selectedSignal)
+                obj.View.swapActivePanel(selectedSignal)
+
+            if ~isempty(newSignal)
+                obj.Model.addSignal(newSignal);
+            end
         end
 
         function handleRemoveCallback(obj, idx)
 
         end
 
-        function handleSelectAvailableCallback(obj, value)
-            obj.View.swapActivePanel(value)
+        function handleSelectAvailableCallback(obj, signalName)
+            obj.View.swapActivePanel(signalName)
         end
 
-        function handleSelectOverallCallback(obj, idx)
+        function handleSelectOverallCallback(obj, idx, swapFlag)
+            signalName = obj.Model.Signals{idx}.Name;
+            if swapFlag
+                obj.View.swapActivePanel(signalName);
+            end
 
+            obj.View.populateActivePanel(obj.Model.Signals{idx})
+            
+            obj.syncViewToModel();
         end
     end
 
