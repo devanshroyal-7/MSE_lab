@@ -5,6 +5,7 @@ classdef OverallPanel < handle
         AvailableListBox
         OverallLabel
         OverallListBox
+        OverallMode
         ClearButton
         AddButton
         RemoveButton
@@ -31,6 +32,8 @@ classdef OverallPanel < handle
             obj.AvailableListBox = uilistbox(obj.MainLayoutGrid, "Items", ["Custom", "Noise", "Ramp", "Sine", "Step", "Swept Sine", "Zero Output"]);
 
             obj.OverallListBox = uilistbox(obj.MainLayoutGrid, "Items", string.empty);
+
+            obj.OverallMode = 'available';
 
             obj.AddButton = uibutton(obj.MainLayoutGrid, "Text", "Add");
 
@@ -94,6 +97,10 @@ classdef OverallPanel < handle
         end
 
         function handleSelectAvailableListBox(obj, ~, event)
+            obj.OverallMode = 'available';
+
+            obj.OverallListBox.Value = string.empty;
+
             if ~isempty(obj.SelectAvailableCallback)
                 selectedSignal = string(event.Value);
                 obj.SelectAvailableCallback(selectedSignal);
@@ -101,6 +108,10 @@ classdef OverallPanel < handle
         end
 
         function handleSelectOverallListBox(obj, ~, event)
+            obj.OverallMode = 'overall';
+
+            obj.AvailableListBox.Value = string.empty;
+
             if ~isempty(obj.SelectOverallCallback)
                 selectedSignal = event.ValueIndex;
 
