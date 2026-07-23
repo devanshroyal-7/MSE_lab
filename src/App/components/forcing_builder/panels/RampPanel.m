@@ -44,7 +44,7 @@ classdef RampPanel < handle
             obj.DurationEditField.Value     = signal.Duration;
             obj.SlopeEditField.Value        = signal.Slope;
             obj.DwellTimeEditField.Value    = signal.DwellTime;
-            obj.DwellLocSwitch.Value        = signal.DwellLoc;
+            obj.DwellLocSwitch.Value        = signal.DwellTimeLoc;
             obj.TwoSidedCheckBox.Value      = signal.TwoSided;
             obj.MirroredCheckBox.Value      = signal.Mirrored;
         end
