@@ -7,6 +7,7 @@ classdef CustomPanel < handle
        CustomEditField
        DurationLabel
        DurationEditField
+       ValueChangedCallback
     end
 
     methods
@@ -33,6 +34,7 @@ classdef CustomPanel < handle
             obj.CustomEditField = uieditfield(obj.MainLayoutGrid, 'text','Value', 'sin(2*t)');
             obj.CustomEditField.Layout.Row = 2;
             obj.CustomEditField.Layout.Column = [1, 3];
+            obj.CustomEditField.ValueChangedFcn = @(~, ~) obj.validateExpression;
 
             obj.DurationLabel = uilabel(obj.MainLayoutGrid, 'Text', 'Duration (s):');
             obj.DurationLabel.Layout.Row = 3;
@@ -41,6 +43,7 @@ classdef CustomPanel < handle
             obj.DurationEditField = uieditfield(obj.MainLayoutGrid, "numeric", "Value", 10);
             obj.DurationEditField.Layout.Row = 3;
             obj.DurationEditField.Layout.Column = [2, 3];
+            obj.DurationEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged;
         end
 
         function gridHandle = getLayout(obj)
@@ -56,6 +59,31 @@ classdef CustomPanel < handle
             signal = CustomSignal( ...
                 obj.CustomEditField.Value, ...
                 obj.DurationEditField.Value);
+        end
+
+        function validateExpression(obj)
+            expr = obj.CustomEditField.Value;
+
+            try
+                safeExpr = vectorize(expr);
+                mathFnc = str2func("@(t) " + safeExpr);
+                res = mathFnc(1);
+
+                if isnumeric(res) && ~any(isnan(res))
+                    obj.ValidLamp.Color = 'green';
+                    obj.parameterChanged();
+                else
+                    obj.ValidLamp.Color = 'red';
+                end
+            catch
+                obj.ValidLamp.Color = 'red';
+            end
+        end
+
+        function parameterChanged(obj)
+            if ~isempty(obj.ValueChangedCallback)
+                obj.ValueChangedCallback();
+            end
         end
     end
 end

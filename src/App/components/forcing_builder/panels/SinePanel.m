@@ -5,6 +5,7 @@ classdef SinePanel < handle
         FreqEditField
         PhaseEditField
         DurationEditField
+        ValueChangedCallback
     end
 
     methods
@@ -17,15 +18,19 @@ classdef SinePanel < handle
             % Render standard fields
             uilabel(obj.MainLayoutGrid, 'Text', 'Amplitude (N):');
             obj.AmpEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
+            obj.AmpEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Frequency (Hz):');
             obj.FreqEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
+            obj.FreqEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Phase (Deg):');
             obj.PhaseEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0.0);
+            obj.PhaseEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Duration (s):');
             obj.DurationEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 5.0);
+            obj.DurationEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
         end
 
         function gridHandle = getLayout(obj)
@@ -45,6 +50,12 @@ classdef SinePanel < handle
                 obj.FreqEditField.Value, ...
                 obj.PhaseEditField.Value, ...
                 obj.DurationEditField.Value);
+        end
+
+        function parameterChanged(obj)
+            if ~isempty(obj.ValueChangedCallback)
+                obj.ValueChangedCallback();
+            end
         end
     end
 end

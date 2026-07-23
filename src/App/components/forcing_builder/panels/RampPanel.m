@@ -7,6 +7,7 @@ classdef RampPanel < handle
         DwellLocSwitch
         TwoSidedCheckBox
         MirroredCheckBox
+        ValueChangedCallback
     end
 
     methods
@@ -19,21 +20,27 @@ classdef RampPanel < handle
             % Render standard fields
             uilabel(obj.MainLayoutGrid, 'Text', 'Slope (N/s):');
             obj.SlopeEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0.4);
+            obj.SlopeEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Duration (s):');
             obj.DurationEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 10.0);
+            obj.DurationEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Dwell Time (s):');
             obj.DwellTimeEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0);
+            obj.DwellTimeEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Dwell Time Location:');
             obj.DwellLocSwitch = uiswitch(obj.MainLayoutGrid, "Items", ["beginning", "end"]);
+            obj.DwellLocSwitch.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Twosided:');
             obj.TwoSidedCheckBox = uicheckbox(obj.MainLayoutGrid, "Text", "");
+            obj.TwoSidedCheckBox.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', "Mirrored:");
             obj.MirroredCheckBox = uicheckbox(obj.MainLayoutGrid, "Text", "");
+            obj.MirroredCheckBox.ValueChangedFcn = @(~, ~) obj.parameterChanged();
         end
 
         function gridHandle = getLayout(obj)
@@ -57,6 +64,12 @@ classdef RampPanel < handle
             obj.DwellLocSwitch.Value, ...
             obj.TwoSidedCheckBox.Value, ...
             obj.MirroredCheckBox.Value);
+        end
+
+        function parameterChanged(obj)
+            if ~isempty(obj.ValueChangedCallback)
+                obj.ValueChangedCallback();
+            end
         end
     end
 end
