@@ -35,5 +35,22 @@ classdef NoisePanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.AmpEditField.Value = signal.Amplitude;
+            obj.LowerFreqEditField.Value = signal.LowerFrequency;
+            obj.UpperFreqEditField.Value = signal.UpperFrequency;
+            obj.DurationEditField.Value = signal.Duration;
+            obj.SeedEditField.Value = signal.Seed;
+        end
+
+        function signal = createSignal(obj)
+            signal = NoiseSignal( ...
+                obj.AmpEditField.Value, ...
+                obj.LowerFreqEditField.Value, ...
+                obj.UpperFreqEditField.Value, ...
+                obj.DurationEditField.Value, ...
+                obj.SeedEditField.Value);
+        end
     end
 end

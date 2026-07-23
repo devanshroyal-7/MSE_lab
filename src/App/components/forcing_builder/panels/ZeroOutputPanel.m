@@ -19,5 +19,14 @@ classdef ZeroOutputPanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.DurationEditField.Value = signal.Duration;
+        end
+
+        function signal = createSignal(obj)
+            signal = ZeroOutputSignal( ...
+                obj.DurationEditField.Value);
+        end
     end
 end

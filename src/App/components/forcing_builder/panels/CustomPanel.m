@@ -46,5 +46,16 @@ classdef CustomPanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.CustomEditField.Value     = signal.Expression;
+            obj.DurationEditField.Value   = signal.Duration;
+        end
+
+        function signal = createSignal(obj)
+            signal = CustomSignal( ...
+                obj.CustomEditField.Value, ...
+                obj.DurationEditField.Value);
+        end
     end
 end

@@ -31,5 +31,20 @@ classdef SinePanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.AmpEditField.Value      = signal.Amplitude;
+            obj.FreqEditField.Value     = signal.Frequency;
+            obj.PhaseEditField.Value    = signal.InitPhase;
+            obj.DurationEditField.Value = signal.Duration;
+        end
+
+        function signal = createSignal(obj)
+            signal = SineSignal( ...
+                obj.AmpEditField.Value, ...
+                obj.FreqEditField.Value, ...
+                obj.PhaseEditField.Value, ...
+                obj.DurationEditField.Value);
+        end
     end
 end

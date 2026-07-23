@@ -31,5 +31,20 @@ classdef SweptSinePanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.AmpEditField.Value          = signal.Amplitude;
+            obj.StartFreqEditField.Value    = signal.StartFrequency;
+            obj.EndFreqEditField.Value      = signal.EndFrequency;
+            obj.DurationEditField.Value     = signal.Duration;
+        end
+
+        function signal = createSignal(obj)
+            signal = SweptSineSignal( ...
+            obj.AmpEditField.Value, ...
+            obj.StartFreqEditField.Value, ...
+            obj.EndFreqEditField.Value, ...
+            obj.DurationEditField.Value);
+        end
     end
 end

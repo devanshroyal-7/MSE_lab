@@ -47,7 +47,7 @@ classdef OverallPanel < handle
             obj.AddButton.ButtonPushedFcn = @(~, ~) obj.handleAddPushed;
             obj.RemoveButton.ButtonPushedFcn = @(~, ~) obj.handleRemovePushed;
             obj.AvailableListBox.ValueChangedFcn = @(src, event) obj.handleSelectAvailableListBox(src, event);
-            obj.OverallListBox.ClickedFcn = @(~, ~) obj.handleSelectOverallListBox;
+            obj.OverallListBox.ValueChangedFcn = @(src, event) obj.handleSelectOverallListBox(src, event);
         end
 
         function layoutComponent(obj)
@@ -100,10 +100,17 @@ classdef OverallPanel < handle
             end
         end
 
-        function handleSelectOverallListBox(obj)
+        function handleSelectOverallListBox(obj, ~, event)
             if ~isempty(obj.SelectOverallCallback)
-                selectedSignal = obj.OverallListBox.ValueIndex;
-                obj.SelectOverallCallback(selectedSignal);
+                selectedSignal = event.ValueIndex;
+
+                % don't destroy panel if same signal is being used
+                if strcmp(event.Value, event.PreviousValue)
+                    swapFlag = false;
+                else
+                    swapFlag = true;
+                end
+                obj.SelectOverallCallback(selectedSignal, swapFlag);
             end
         end
     end

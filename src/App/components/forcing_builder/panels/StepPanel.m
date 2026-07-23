@@ -27,5 +27,18 @@ classdef StepPanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.MagEditField.Value      = signal.Magnitude;
+            obj.OnTimeEditField.Value   = signal.OnTime;
+            obj.OffTimeEditField.Value  = signal.OffTime;
+        end
+
+        function signal = createSignal(obj)
+            signal = StepSignal( ...
+                obj.MagEditField.Value, ...
+                obj.OnTimeEditField.Value, ...
+                obj.OffTimeEditField.Value);
+        end
     end
 end

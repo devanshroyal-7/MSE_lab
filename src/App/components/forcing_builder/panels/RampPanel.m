@@ -39,5 +39,24 @@ classdef RampPanel < handle
         function gridHandle = getLayout(obj)
             gridHandle = obj.MainLayoutGrid;
         end
+
+        function populate(obj, signal)
+            obj.DurationEditField.Value     = signal.Duration;
+            obj.SlopeEditField.Value        = signal.Slope;
+            obj.DwellTimeEditField.Value    = signal.DwellTime;
+            obj.DwellLocSwitch.Value        = signal.DwellLoc;
+            obj.TwoSidedCheckBox.Value      = signal.TwoSided;
+            obj.MirroredCheckBox.Value      = signal.Mirrored;
+        end
+
+        function signal = createSignal(obj)
+            signal = RampSignal( ...
+            obj.SlopeEditField.Value, ...
+            obj.DurationEditField.Value, ...
+            obj.DwellTimeEditField.Value, ...
+            obj.DwellLocSwitch.Value, ...
+            obj.TwoSidedCheckBox.Value, ...
+            obj.MirroredCheckBox.Value);
+        end
     end
 end
