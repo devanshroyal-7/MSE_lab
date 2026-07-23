@@ -2,7 +2,7 @@ classdef StepSignal < BaseSignal
     % Subclass for Step Signal
 
     properties
-        Name = "Step Signal"
+        Name = "Step"
         Magnitude   % [N]
         OffTime = 1 % [s]
         OnTime  = 1 % [s]
