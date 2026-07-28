@@ -2,6 +2,7 @@ classdef SignalBuilderView < handle
     % Use grid size 940 x 630
 
     properties
+        UIFigure
         MainLayoutGrid
         PlotPanel
         Plot
@@ -22,6 +23,7 @@ classdef SignalBuilderView < handle
         SelectOverallCallbackView
         ValueChangedCallbackView
         ViewSwitchCallbackView
+        FinishCallbackView
     end
 
     events
@@ -37,6 +39,7 @@ classdef SignalBuilderView < handle
 
     methods (Access = private)
         function createComponents(obj, parentContainer)
+            obj.UIFigure = parentContainer;
 
     		obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 3]);
     		obj.MainLayoutGrid.RowHeight = {300, 300};
@@ -77,6 +80,8 @@ classdef SignalBuilderView < handle
                 "Title", "Additional Parameters", "FontWeight", "bold");
 
             obj.AdditionalSetup = AdditionalPanel(obj.PanelAdditional);
+            
+            obj.AdditionalSetup.FinishCallback = @() obj.FinishCallbackView();
         end
 
         function layoutComponents(obj)
@@ -186,6 +191,12 @@ classdef SignalBuilderView < handle
         function fwdViewSwitchChangedCallback(obj)
             if ~isempty(obj.ViewSwitchCallbackView)
                 obj.ViewSwitchCallbackView();
+            end
+        end
+
+        function fwdFinishCallback(obj)
+            if ~isempty(obj.FinishCallbackView)
+                obj.FinishCallbackView
             end
         end
 

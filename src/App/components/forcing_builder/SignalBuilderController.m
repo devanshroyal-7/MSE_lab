@@ -5,6 +5,8 @@ classdef SignalBuilderController < handle
         
         ModelListeners  = event.listener.empty();
         ViewListeners   = event.listener.empty();
+
+        IsFinished = false;     % tracks if signal building is finished
     end
 
     methods
@@ -21,6 +23,7 @@ classdef SignalBuilderController < handle
             obj.View.SelectOverallCallbackView = @(idx, swapFlag) obj.handleSelectOverallCallback(idx, swapFlag);
             obj.View.ValueChangedCallbackView = @() obj.handleValueChangedCallback();
             obj.View.ViewSwitchCallbackView = @() obj.handleViewSwitchChangedCallback();
+            obj.View.FinishCallbackView = @() obj.handleFinishCallback();
             obj.syncViewToModel();
         end
 
@@ -120,6 +123,12 @@ classdef SignalBuilderController < handle
 
         function handleViewSwitchChangedCallback(obj)
             obj.syncViewToModel();
+        end
+
+        function handleFinishCallback(obj)
+            obj.IsFinished = true;
+
+            uiresume(obj.View.UIFigure)
         end
 
         function resetToInitState(obj)
