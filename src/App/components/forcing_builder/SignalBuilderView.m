@@ -20,6 +20,8 @@ classdef SignalBuilderView < handle
         RemoveCallbackView
         SelectAvailableCallbackView
         SelectOverallCallbackView
+        ValueChangedCallbackView
+        ViewSwitchCallbackView
     end
 
     events
@@ -58,7 +60,7 @@ classdef SignalBuilderView < handle
             obj.OverallListWidget.RemoveCallback = @(idx) obj.fwdRemoveCallback(idx);
             obj.OverallListWidget.SelectAvailableCallback = @(value) obj.fwdSelectAvailableCallback(value);
             obj.OverallListWidget.SelectOverallCallback = @(idx, swapFlag) obj.fwdSelectOverallCallback(idx, swapFlag);
-
+            obj.OverallListWidget.ViewSwitchCallback = @() obj.fwdViewSwitchChangedCallback();
 
     		% Function Setup Panel
     		obj.PanelForcing = uipanel(obj.MainLayoutGrid, ...
@@ -123,6 +125,8 @@ classdef SignalBuilderView < handle
                     obj.ActiveSetupPanel = ZeroOutputPanel(obj.ForcingCanvas);
             end
 
+            obj.ActiveSetupPanel.ValueChangedCallback = @() obj.fwdValueChangedCallback;
+
             obj.ActivePanelName = panelName;
         end
 
@@ -171,6 +175,24 @@ classdef SignalBuilderView < handle
             if ~isempty(obj.SelectOverallCallbackView)
                 obj.SelectOverallCallbackView(idx, swapFlag);
             end
+        end
+
+        function fwdValueChangedCallback(obj)
+            if ~isempty(obj.ValueChangedCallbackView)
+                obj.ValueChangedCallbackView();
+            end
+        end
+
+        function fwdViewSwitchChangedCallback(obj)
+            if ~isempty(obj.ViewSwitchCallbackView)
+                obj.ViewSwitchCallbackView();
+            end
+        end
+
+        function resetView(obj)
+            obj.OverallListWidget.resetOverallWidget();
+            
+            obj.swapActivePanel('Custom');
         end
     end
 end
