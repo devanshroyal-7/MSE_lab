@@ -118,6 +118,14 @@ classdef SignalBuilderController < handle
 
         function handleValueChangedCallback(obj)
             % trigger plot update if editfield changes
+            if strcmp(obj.View.OverallListWidget.OverallMode, 'overall')
+                updatedSignal = obj.View.getActiveSignal();
+                
+                selectedIdx = obj.View.OverallListWidget.OverallListBox.ValueIndex;
+
+                obj.Model.Signals{selectedIdx} = updatedSignal;
+            end
+
             obj.syncViewToModel();
         end
 
