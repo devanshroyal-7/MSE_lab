@@ -17,6 +17,7 @@ classdef OverallPanel < handle
         RemoveCallback
         SelectAvailableCallback
         SelectOverallCallback
+        ViewSwitchCallback
     end
 
     methods
@@ -44,6 +45,7 @@ classdef OverallPanel < handle
             obj.ViewLabel = uilabel(obj.MainLayoutGrid, "Text", "Plot view: ", "VerticalAlignment", "bottom");
 
             obj.ViewSwitch = uiswitch(obj.MainLayoutGrid, "Items", ["Single", "Overall"]);
+            obj.ViewSwitch.Enable = 'off';
 
             obj.layoutComponent();
 
@@ -51,6 +53,7 @@ classdef OverallPanel < handle
             obj.RemoveButton.ButtonPushedFcn = @(~, ~) obj.handleRemovePushed;
             obj.AvailableListBox.ValueChangedFcn = @(src, event) obj.handleSelectAvailableListBox(src, event);
             obj.OverallListBox.ValueChangedFcn = @(src, event) obj.handleSelectOverallListBox(src, event);
+            obj.ViewSwitch.ValueChangedFcn = @(src, event) obj.handleViewSwitchCallback(src, event);
         end
 
         function layoutComponent(obj)
@@ -92,7 +95,9 @@ classdef OverallPanel < handle
         function handleRemovePushed(obj)
             if ~isempty(obj.RemoveCallback)
                 selectedSignal = obj.OverallListBox.ValueIndex;
-                obj.RemoveCallback(selectedSignal);
+                if strcmp(obj.OverallMode, 'overall')
+                    obj.RemoveCallback(selectedSignal);
+                end
             end
         end
 
@@ -101,6 +106,10 @@ classdef OverallPanel < handle
 
             obj.OverallListBox.Value = string.empty;
 
+            obj.ViewSwitch.Value = 'Single';
+
+            obj.ViewSwitch.Enable = 'off';
+            
             if ~isempty(obj.SelectAvailableCallback)
                 selectedSignal = string(event.Value);
                 obj.SelectAvailableCallback(selectedSignal);
@@ -111,6 +120,8 @@ classdef OverallPanel < handle
             obj.OverallMode = 'overall';
 
             obj.AvailableListBox.Value = string.empty;
+
+            obj.ViewSwitch.Enable = 'on';
 
             if ~isempty(obj.SelectOverallCallback)
                 selectedSignal = event.ValueIndex;
@@ -123,6 +134,22 @@ classdef OverallPanel < handle
                 end
                 obj.SelectOverallCallback(selectedSignal, swapFlag);
             end
+        end
+
+        function handleViewSwitchCallback(obj, ~, ~)
+            if strcmp(obj.OverallMode, 'overall') && ~isempty(obj.ViewSwitchCallback)
+                obj.ViewSwitchCallback();
+            end
+        end
+
+        function resetOverallWidget(obj)
+            obj.OverallMode = 'available';
+
+            obj.AvailableListBox.Value = 'Custom';
+
+            obj.OverallListBox.Value = string.empty;
+
+            obj.ViewSwitch.Value = 'Single';
         end
     end
 end
