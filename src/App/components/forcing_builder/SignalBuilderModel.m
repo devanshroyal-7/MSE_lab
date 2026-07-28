@@ -41,7 +41,7 @@ classdef SignalBuilderModel < handle
         end
 
         function removeSignal(obj, index)
-            if index > 0 && index <= length(obj.Signals)
+            if ~isempty(index) && isscalar(index) && index > 0 && index <= length(obj.Signals)
                 obj.Signals(index) = [];
 
                 notify(obj, 'DataUpdated');
@@ -82,6 +82,25 @@ classdef SignalBuilderModel < handle
             dt = 1/obj.SampleRate;
             t = 0:dt:obj.Signals{idx}.TotalDuration;
             y = obj.Signals{idx}.evaluate(t);
+        end
+
+        function [t, y] = evaluateSignal(obj, SigObject)
+            % this method is for signals that are not part of the model
+            % e.g. temp signals for the available select
+            dt = 1/obj.SampleRate;
+            
+            if isempty(SigObject)
+                t = [];
+                y = [];
+                return;
+            end
+
+            t = 0:dt:SigObject.TotalDuration;
+            y = SigObject.evaluate(t);
+        end
+
+        function resetModel(obj)
+            obj.Signals = {};
         end
     end
 end
