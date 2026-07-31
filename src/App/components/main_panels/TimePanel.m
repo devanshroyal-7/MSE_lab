@@ -14,9 +14,13 @@ classdef TimePanel < handle
         function obj = TimePanel(parentContainer)
             obj.MainLayoutGrid = uigridlayout(parentContainer, [3, 2]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 300, 30};
+            obj.MainLayoutGrid.RowHeight = {30, '10x', 30};
 
-            obj.ResponseLabel = uilabel(obj.MainLayoutGrid, "Text", "Response Plot", "FontWeight", "bold", "FontSize", 17, "VerticalAlignment", "bottom");
+            obj.ResponseLabel = uilabel(obj.MainLayoutGrid, ...
+            "Text", "Response Plot", ...
+            "FontWeight", "bold", ...
+            "FontSize", 17, ...
+            "VerticalAlignment", "bottom");
             obj.ResponseLabel.Layout.Column = 1;
             obj.ResponseLabel.Layout.Row = 1;
 
@@ -26,11 +30,15 @@ classdef TimePanel < handle
             padTimescope.Layout.Row = 2;
             obj.ResponsePlot = uitimescope(padTimescope, "XGrid", "on", "YGrid", "on");
             
-            obj.ReferenceLabel = uilabel(obj.MainLayoutGrid, "Text", "Reference Plot", "FontWeight", "bold", "FontSize", 17, "VerticalAlignment", "bottom");
+            obj.ReferenceLabel = uilabel(obj.MainLayoutGrid, ...
+            "Text", "Reference Plot", ...
+            "FontWeight", "bold", ...
+            "FontSize", 17, ...
+            "VerticalAlignment", "bottom");
             obj.ReferenceLabel.Layout.Column = 2;
             obj.ReferenceLabel.Layout.Row = 1;
 
-            obj.ReferencePlot = uiaxes(obj.MainLayoutGrid);
+            obj.ReferencePlot = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
             obj.ReferencePlot.Layout.Column = 2;
             obj.ReferencePlot.Layout.Row = 2;
 
@@ -39,13 +47,17 @@ classdef TimePanel < handle
             padCheckbox.Layout.Column = 1;
             padCheckbox.Layout.Row = 3;
             obj.OverlayCheckBox = uicheckbox(padCheckbox, "Text", "  Overlay Reference", "Value", false);
-            
-            padButton = uigridlayout(obj.MainLayoutGrid, [1, 3]);
+            obj.OverlayCheckBox.Layout.Column = 1;
+            obj.OverlayCheckBox.Layout.Row = 1;
+
+
+            padButton = uigridlayout(obj.MainLayoutGrid, [1, 2]);
             padButton.Layout.Column = 2;
             padButton.Layout.Row = 3;
             padButton.Padding = [0, 0, 0, 0];
+            padButton.ColumnWidth = {'1x', 200};
             obj.SignalButton = uibutton(padButton, "Text", "Create Forcing Function");
-            obj.SignalButton.Layout.Column = 3;
+            obj.SignalButton.Layout.Column = 2;
         end
     end
 end
