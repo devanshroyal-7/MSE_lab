@@ -1,4 +1,6 @@
 classdef AppView < handle
+    % use size [500, 500, 1100, 850]
+
     properties 
         MainLayoutGrid
         SimControl
@@ -49,6 +51,9 @@ classdef AppView < handle
             obj.TimeDomainPanel = TimePanel(TimeTab);
 
             FrequencyTab = uitab(obj.TabGroup, "Title", "Freuqency");
+            obj.FreqDomainPanel = FrequencyPanel(FrequencyTab);
+
+            ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
         end
     end
 end
