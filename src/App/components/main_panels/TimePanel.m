@@ -24,7 +24,9 @@ classdef TimePanel < handle
             obj.ResponseLabel.Layout.Column = [1 2];
             obj.ResponseLabel.Layout.Row = 1;
             
-            obj.ResponsePlot = uitimescope(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
+            obj.ResponsePlot = uiaxes(obj.MainLayoutGrid, ...
+                "XGrid", "on", ...
+                "YGrid", "on");
             obj.ResponsePlot.Layout.Column = [1 2];
             obj.ResponsePlot.Layout.Row = 2;
             
@@ -51,16 +53,6 @@ classdef TimePanel < handle
             obj.ReferencePlot = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
             obj.ReferencePlot.Layout.Column = [1 2];
             obj.ReferencePlot.Layout.Row = 5; 
-            
-            % Controls Section (Bottom - Signal Button)
-            padButton = uigridlayout(obj.MainLayoutGrid, [1, 2]);
-            padButton.Padding = [0, 0, 0, 0];
-            padButton.Layout.Column = 2;
-            padButton.Layout.Row = 6; 
-            padButton.ColumnWidth = {'1x', 200};
-            
-            obj.SignalButton = uibutton(padButton, "Text", "Create Forcing Function");
-            obj.SignalButton.Layout.Column = 2;
         end
     end
 end
