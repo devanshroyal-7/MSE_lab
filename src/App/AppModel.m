@@ -2,7 +2,7 @@ classdef AppModel < handle
 
     % Public properties that correspond to the Simulink model
     properties (Access = public, Transient)
-        Simulation simulink.Simulation
+        Simulation 
         T (1,1) double {mustBeFloat} = 0.001;
 
     end
@@ -18,19 +18,52 @@ classdef AppModel < handle
         % Simulation parameters
         k_sim       (1,1) double = 0;   % simulated stiffness   [N/m]
         b_sim       (1,1) double = 0;   % simulated damping     [Ns/m]
+
+        % Simulation control and configuration
+        SimulationModelName (1,1) string = "MSE_PLANT";
+        
+        S   (1,1) double {mustBeNumeric} = 10;  % simulation time   [s]
+        TimeBuffer      (1,:) double = [];
+        PositionBuffer  (1,:) double = [];
+        VelocityBuffer  (1,:) double = [];
+        ForcingSignal           % timeseries object from SignalBuilder
     end
 
-    properties (Access = protected)
-        S   (1,1) double {mustBeNumeric} = 10;  % simulation time   [s]
-        t   (1,:) double {mustBeFloat} = [];    % time vector       [s]
+    events 
+        DataUpdated
     end
         
 
     methods (Access = public)
+        function obj = AppModel()
+            % Load "MSE_Plant" simulink model
+            if ~bdIsLoaded(obj.SimulationModelName)
+                load_system(obj.SimulationModelName)
+            end
+        end
 
-        % Associate the Simulink Model
-        app.Simulation = simulation('MSE_PLANT');
-        
+        function setForcingInput(obj, tsInput)
+            obj.ForcingSignal = tsInput;
+            obj.S = tsInput.Time(end);
+
+            % push to base workspace
+            assignin('base', 'sim_input', tsInput);
+            assignin('base', 'k_sim', obj.k_sim);
+            assignin('base', 'b_sim', obj.b_sim);
+
+            set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
+        end
+
+        function startSimulation(obj)
+            % clear up buffer
+            obj.TimeBuffer = [];
+            obj.PositionBuffer = [];
+            obj.VelocityBuffer = [];
+            
+            % set simulation mode to slrdt
+            set_param(obj.SimulationModelName, 'SimulationMode', 'external');
+            
+            set_param(obj.SimulationModelName, 'SimulaitonCommand', 'start');
+        end
     end
-
 end
