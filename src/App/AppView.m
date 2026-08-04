@@ -31,18 +31,15 @@ classdef AppView < handle
                 "FontSize", 25, ...
                 "HorizontalAlignment", 'left');
 
-            % Simulation Controls
-            obj.SimStart = uibutton(obj.MainLayoutGrid, "state", ...
-                "Text", "Start Simulation", ...
-                "Icon","slrdt_start.png", ...
-                "IconAlignment","top", ...
-                "ButtonPushedFcn", @(~,~) obj.RunSimCallback);
-            obj.SimStart.Layout.Column = 9;
-            obj.SimStart.Layout.Row = 1;
+            logopadding = uigridlayout(obj.MainLayoutGrid, [1, 1]);
+            logopadding.Layout.Column = [9, 10];
+            logopadding.Layout.Row = 1;
+            robots5Logo = uiimage(logopadding, ...
+                "ImageSource", "robots5_logo.png");
 
             % Tabs
             obj.TabGroup = uitabgroup(obj.MainLayoutGrid);
-            obj.TabGroup.Layout.Column = [1, 10];
+            obj.TabGroup.Layout.Column = [1, 7];
             obj.TabGroup.Layout.Row = [2, 9];
 
             % Save Button
@@ -65,6 +62,12 @@ classdef AppView < handle
 
             % Controls
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
+            
+            SidePanel = uipanel(obj.MainLayoutGrid);
+            SidePanel.Layout.Column = [8, 10];
+            SidePanel.Layout.Row = [2, 9];
+
+            Sidebar = SidebarPanel(SidePanel);
         end
 
         function RunSimCallback(obj)
