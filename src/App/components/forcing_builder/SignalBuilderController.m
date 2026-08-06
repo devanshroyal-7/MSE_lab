@@ -15,8 +15,8 @@ classdef SignalBuilderController < handle
             obj.View = view;
 
             obj.ModelListeners = addlistener(obj.Model, 'DataUpdated', @(~, ~) obj.handleModelUpdated);
-            % obj.ViewListeners = addlistener(obj.View, 'ViewUpdated', @(~, ~) obj.handleViewUpdated);
-
+            
+            % callback functions
             obj.View.AddCallbackView = @(value) obj.handleAddCallback(value);
             obj.View.RemoveCallbackView = @(idx) obj.handleRemoveCallback(idx);
             obj.View.SelectAvailableCallbackView = @(value) obj.handleSelectAvailableCallback(value);
@@ -24,12 +24,22 @@ classdef SignalBuilderController < handle
             obj.View.ValueChangedCallbackView = @() obj.handleValueChangedCallback();
             obj.View.ViewSwitchCallbackView = @() obj.handleViewSwitchChangedCallback();
             obj.View.FinishCallbackView = @() obj.handleFinishCallback();
+            
+            % plot initial value
             obj.syncViewToModel();
         end
 
         function syncViewToModel(obj)
+            %{
+            The model always serves as the ground truth about the data
+            stored. This function will take inputs from the user (from
+            view) and pull the relevant data from the model and plot it at
+            the end. 
+            %}
+
             signalNames = string.empty;
 
+            % update names in listbox widget from model
             for i1 = 1:length(obj.Model.Signals)
                 signalNames(i1) = obj.Model.Signals{i1}.Name;
             end
@@ -39,6 +49,7 @@ classdef SignalBuilderController < handle
             viewMode = obj.View.OverallListWidget.ViewSwitch.Value;
             overallMode = obj.View.OverallListWidget.OverallMode;
 
+            % plot a temporary signal for reference when in available mode
             if strcmp(overallMode, 'available')
                 tempSignal = obj.View.getActiveSignal();
                 [t, y] = obj.Model.evaluateSignal(tempSignal);
@@ -46,6 +57,7 @@ classdef SignalBuilderController < handle
                 return;
             end
 
+            % might be redundant
             if isempty(obj.Model.Signals)
                 obj.View.updatePlot([], []);
                 return;
@@ -73,7 +85,7 @@ classdef SignalBuilderController < handle
             if obj.View.ActivePanelName ~= string(selectedSignal)
                 obj.View.swapActivePanel(selectedSignal)
             end
-
+            
             newSignal = obj.View.getActiveSignal();
 
             if ~isempty(newSignal)
