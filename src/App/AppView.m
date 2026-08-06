@@ -18,7 +18,7 @@ classdef AppView < handle
         function obj = AppView(parentContainer)
             obj.MainLayoutGrid = uigridlayout(parentContainer, [10, 10]);
             obj.MainLayoutGrid.Padding = [0, 10, 0, 10];
-            obj.MainLayoutGrid.RowHeight = {60, '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {60, '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x'};
             obj.MainLayoutGrid.ColumnWidth = {100, '1x', '1x', 100, 100, 100, '1x', '1x', 100, 100};
             
             % Title 
@@ -40,18 +40,8 @@ classdef AppView < handle
             % Tabs
             obj.TabGroup = uitabgroup(obj.MainLayoutGrid);
             obj.TabGroup.Layout.Column = [1, 7];
-            obj.TabGroup.Layout.Row = [2, 9];
+            obj.TabGroup.Layout.Row = [2, 10];
 
-            % Save Button
-            SaveButtonGrid = uigridlayout(obj.MainLayoutGrid, [1, 2]);
-            SaveButtonGrid.Layout.Column = [8, 10];
-            SaveButtonGrid.Layout.Row = 10;
-            SaveButtonGrid.Padding = [0, 0, 12, 0];
-            SaveButtonGrid.ColumnWidth = {'1x', 200};
-            obj.SaveButton = uibutton(SaveButtonGrid, "Text", "Save Output");
-            obj.SaveButton.Layout.Column = 2;
-            obj.SaveButton.Layout.Row = 1;
-            
             % Time Domain
             TimeTab = uitab(obj.TabGroup, "Title", "Time");
             obj.TimeDomainPanel = TimePanel(TimeTab);
@@ -65,7 +55,7 @@ classdef AppView < handle
             
             SidePanel = uipanel(obj.MainLayoutGrid);
             SidePanel.Layout.Column = [8, 10];
-            SidePanel.Layout.Row = [2, 9];
+            SidePanel.Layout.Row = [2, 10];
 
             Sidebar = SidebarPanel(SidePanel);
         end
