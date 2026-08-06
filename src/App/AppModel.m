@@ -40,6 +40,10 @@ classdef AppModel < handle
             if ~bdIsLoaded(obj.SimulationModelName)
                 load_system(obj.SimulationModelName)
             end
+            assignin('base', "T", obj.T);
+            assignin('base', "r", obj.r);
+            assignin('base', "Kt", obj.Kt);
+            assignin('base', "motor_eff", obj.motor_eff);
         end
 
         function setForcingInput(obj, tsInput)
@@ -63,7 +67,7 @@ classdef AppModel < handle
             % set simulation mode to slrdt
             set_param(obj.SimulationModelName, 'SimulationMode', 'external');
             
-            set_param(obj.SimulationModelName, 'SimulaitonCommand', 'start');
+            set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
         end
     end
 end
