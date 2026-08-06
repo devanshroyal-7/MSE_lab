@@ -6,18 +6,21 @@ classdef AppView < handle
         SimStart
         TabGroup
         SaveButton
-        % TimeTab
         TimeDomainPanel
         FreqDomainPanel
+        Sidebar
 
         % Callback properties
-        fwdRunSimCallback
+        fwdRunSimCallbackView
+        fwdSignalBuilderCallbackView
+        fwdSaveOutputCallbackView
     end
 
     methods
         function obj = AppView(parentContainer)
             obj.MainLayoutGrid = uigridlayout(parentContainer, [10, 10]);
-            obj.MainLayoutGrid.Padding = [0, 10, 0, 10];
+            % obj.MainLayoutGrid.ColumnSpacing = 0;
+            obj.MainLayoutGrid.Padding = [0, 0, 0, 10];
             obj.MainLayoutGrid.RowHeight = {60, '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x'};
             obj.MainLayoutGrid.ColumnWidth = {100, '1x', '1x', 100, 100, 100, '1x', '1x', 100, 100};
             
@@ -54,15 +57,31 @@ classdef AppView < handle
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
             
             SidePanel = uipanel(obj.MainLayoutGrid);
+            SidePanel.BorderType = 'none';
             SidePanel.Layout.Column = [8, 10];
             SidePanel.Layout.Row = [2, 10];
 
-            Sidebar = SidebarPanel(SidePanel);
+            obj.Sidebar = SidebarPanel(SidePanel);
+            obj.Sidebar.fwdRunSignalCallback = @() obj.handleRunSimCallback();
+            obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
+            obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
         end
 
-        function RunSimCallback(obj)
-            if ~isempty(obj.fwdRunSimCallback)
-                obj.fwdRunSimCallback();
+        function handleRunSimCallback(obj)
+            if ~isempty(obj.fwdRunSimCallbackView)
+                obj.fwdRunSimCallbackView();
+            end
+        end
+
+        function handleSignalBuilderCallback(obj)
+            if ~isempty(obj.fwdSignalBuilderCallbackView)
+                obj.fwdSignalBuilderCallbackView();
+            end
+        end
+
+        function handleSaveOutputCallback(obj)
+            if ~isempty(obj.fwdSaveOutputCallbackView())
+                obj.fwdSaveOutputCallbackView();
             end
         end
     end
