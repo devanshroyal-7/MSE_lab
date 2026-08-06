@@ -15,6 +15,10 @@ classdef SignalBuilderModel < handle
 
     %}
 
+    events
+        DataUpdated
+    end
+
     properties
         Signals = {}
         SampleRate = 1000
@@ -32,16 +36,22 @@ classdef SignalBuilderModel < handle
             end
             
             obj.Signals{end+1} = newSignal;
+
+            notify(obj, 'DataUpdated');
         end
 
         function removeSignal(obj, index)
-            if index > 0 && index <= length(obj.Signals)
+            if ~isempty(index) && isscalar(index) && index > 0 && index <= length(obj.Signals)
                 obj.Signals(index) = [];
+
+                notify(obj, 'DataUpdated');
             end
         end
 
         function clearAll(obj)
             obj.Signals = {};
+
+            notify(obj, 'DataUpdated');
         end
 
         function td = get.TotalDuration(obj)
@@ -63,9 +73,34 @@ classdef SignalBuilderModel < handle
             t = 0:dt:obj.TotalDuration;
 
             y = zeros(size(t));
-            for i = 1:length(obj.Signals)
-                y = y + obj.Signals{i}.evaluate(t);
+            for i1 = 1:length(obj.Signals)
+                y = y + obj.Signals{i1}.evaluate(t);
             end
+        end
+
+        function [t, y] = evaluateIndividualSignal(obj, idx)
+            dt = 1/obj.SampleRate;
+            t = 0:dt:obj.Signals{idx}.TotalDuration;
+            y = obj.Signals{idx}.evaluate(t);
+        end
+
+        function [t, y] = evaluateSignal(obj, SigObject)
+            % this method is for signals that are not part of the model
+            % e.g. temp signals for the available select
+            dt = 1/obj.SampleRate;
+            
+            if isempty(SigObject)
+                t = [];
+                y = [];
+                return;
+            end
+
+            t = 0:dt:SigObject.TotalDuration;
+            y = SigObject.evaluate(t);
+        end
+
+        function resetModel(obj)
+            obj.Signals = {};
         end
     end
 end

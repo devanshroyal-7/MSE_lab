@@ -1,176 +1,210 @@
-classdef SignalBuilderView < matlab.ui.componentcontainer.ComponentContainer
+classdef SignalBuilderView < handle
+    % Use grid size 940 x 630
 
-    % Properties that correspond to underlying components
-    properties (Access = private, Transient, NonCopyable)
-        GridLayout             matlab.ui.container.GridLayout
-        FunctionSetupLabel     matlab.ui.control.Label
-        ForcingFunctionsLabel  matlab.ui.control.Label
-        ClearButton            matlab.ui.control.Button
-        RemoveButton           matlab.ui.control.Button
-        AddButton              matlab.ui.control.Button
-        OverallListBox         matlab.ui.control.ListBox
-        OverallListBoxLabel    matlab.ui.control.Label
-        AvailableListBox       matlab.ui.control.ListBox
-        AvailableListBoxLabel  matlab.ui.control.Label
+    properties
+        UIFigure
+        MainLayoutGrid
+        PlotPanel
+        Plot
+        PanelOverall
+        OverallListWidget
+        PanelForcing
+        ActiveSetupPanel
+        ActivePanelName
+        ForcingCanvas
+        PanelAdditional
+        AdditionalSetup
+
+        % View Callback functions % these callbacks pass it from overall panel to
+        % the SignalBuilderController
+        AddCallbackView
+        RemoveCallbackView
+        SelectAvailableCallbackView
+        SelectOverallCallbackView
+        ValueChangedCallbackView
+        ViewSwitchCallbackView
+        FinishCallbackView
     end
 
-    properties (Access = public)
-        Items string % List of Items in available components
+    events
+        ViewUpdated
     end
-    
-    % Callbacks that handle component events
+
+    methods
+        function obj = SignalBuilderView(parentContainer)
+    		obj.createComponents(parentContainer)
+    		obj.layoutComponents()
+    	end
+    end
+
     methods (Access = private)
+        function createComponents(obj, parentContainer)
+            obj.UIFigure = parentContainer;
 
-        % Double-clicked callback: AvailableListBox
-        function AvailableListBoxClicked(comp, event)
-            availableList = comp.AvailableListBox;
-            selectedList = comp.OverallListBox;
+    		obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 3]);
+    		obj.MainLayoutGrid.RowHeight = {300, 300};
+    		obj.MainLayoutGrid.ColumnWidth = {300, 300, 300};
 
-            new_item = availableList.Value;
+    		% Forcing Function Plot Panel
+    		obj.PlotPanel = uipanel(obj.MainLayoutGrid, ...
+        		"Title", "Function Plot", "FontWeight", "bold");
 
-            if isempty(new_item)
-                return;
-            end
+    		plotGrid = uigridlayout(obj.PlotPanel, [1, 1]);
+    		plotGrid.Padding = [10, 10, 10, 10];
+    		obj.Plot = uiaxes(plotGrid, "XGrid", "on", "YGrid", "on");
 
-            selectedList.Items = [cellstr(selectedList.Items), {new_item}];
+    		% Overall List Panel
+    		obj.PanelOverall = uipanel(obj.MainLayoutGrid, ...
+        		"Title", "Select Functions", "FontWeight", "bold");
 
+            obj.OverallListWidget = OverallPanel(obj.PanelOverall);
+
+            obj.OverallListWidget.AddCallback = @(value) obj.fwdAddCallback(value);
+            obj.OverallListWidget.RemoveCallback = @(idx) obj.fwdRemoveCallback(idx);
+            obj.OverallListWidget.SelectAvailableCallback = @(value) obj.fwdSelectAvailableCallback(value);
+            obj.OverallListWidget.SelectOverallCallback = @(idx, swapFlag) obj.fwdSelectOverallCallback(idx, swapFlag);
+            obj.OverallListWidget.ViewSwitchCallback = @() obj.fwdViewSwitchChangedCallback();
+
+    		% Function Setup Panel
+    		obj.PanelForcing = uipanel(obj.MainLayoutGrid, ...
+        		"Title", "Function Setup", "FontWeight", "bold");
+
+            obj.ForcingCanvas  = uigridlayout(obj.PanelForcing, [1, 1]);
+            obj.ForcingCanvas.Padding = [0, 0, 0, 0];
+
+            obj.swapActivePanel("Custom");      % Initialize with Custom
+
+
+    		% Additional Parameter Panel
+    		obj.PanelAdditional = uipanel(obj.MainLayoutGrid, ...
+                "Title", "Additional Parameters", "FontWeight", "bold");
+
+            obj.AdditionalSetup = AdditionalPanel(obj.PanelAdditional);
+            
+            obj.AdditionalSetup.FinishCallback = @() obj.FinishCallbackView();
         end
 
-        % Button pushed function: AddButton
-        function AddButtonPushed(comp, event)
-            % gridLayout = findobj(comp.Parent, 'Type', 'uigridlayout');
+        function layoutComponents(obj)
 
-            availableList = comp.AvailableListBox;
-            selectedList = comp.OverallListBox;
+            obj.PlotPanel.Layout.Row = 1;
+            obj.PlotPanel.Layout.Column = [1, 3];
 
-            new_item = availableList.Value;
+            obj.PanelOverall.Layout.Row = 2;
+            obj.PanelOverall.Layout.Column = 1;
 
-            if isempty(new_item)
-                return;
-            end
+            obj.PanelForcing.Layout.Row = 2;
+            obj.PanelForcing.Layout.Column = 2;
 
-            selectedList.Items = [cellstr(selectedList.Items), {new_item}];
-            selectedList.ItemsData = 1:numel(comp.OverallListBox.Items);
-
-        end
-
-        % Button pushed function: RemoveButton
-        function RemoveButtonPushed(comp, event)
-            selectedList = comp.OverallListBox;
-
-            currentItems = cellstr(selectedList.Items);
-            remove_item_idx = selectedList.Value;
-            
-            if ~isempty(remove_item_idx)
-                % indicesToRemove = ismember(currentItems, remove_item);
-
-                currentItems(remove_item_idx) = [];
-
-                selectedList.Items = currentItems;
-                selectedList.Value = {};
-
-                selectedList.ItemsData = 1:numel(currentItems);
-            end
-
-
-
-            
-        end
-
-        % Button pushed function: ClearButton
-        function ClearButtonPushed(comp, event)
-            selectedList = comp.OverallListBox;
-
-            selectedList.Items = {};
-
-            
-
+            obj.PanelAdditional.Layout.Row = 2;
+            obj.PanelAdditional.Layout.Column = 3;
         end
     end
 
-    methods (Access = protected)
-        
-        % Code that executes when the value of a property is changed
-        function update(comp)
-            % Use this function to update the underlying components
-            
+    methods
+        function updatePlot(obj, t, y)
+            plot(obj.Plot, t, y);
         end
 
-        % Create the underlying components
-        function setup(comp)
+        function swapActivePanel(obj, panelName)
+            panelName = string(panelName);
 
-            comp.Position = [1 1 668 332];
+            if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
+                delete(obj.ActiveSetupPanel.MainLayoutGrid);
+                obj.ActiveSetupPanel = [];
+            end
 
-            % Create GridLayout
-            comp.GridLayout = uigridlayout(comp);
-            comp.GridLayout.ColumnWidth = {'2x', '1x', '1x', '1x', '1x', '1x'};
-            comp.GridLayout.RowHeight = {'1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x'};
+            switch panelName
+                case "Custom"
+                    obj.ActiveSetupPanel = CustomPanel(obj.ForcingCanvas);
+                case "Noise"
+                    obj.ActiveSetupPanel = NoisePanel(obj.ForcingCanvas);
+                case "Ramp"
+                    obj.ActiveSetupPanel = RampPanel(obj.ForcingCanvas);
+                case "Sine"
+                    obj.ActiveSetupPanel = SinePanel(obj.ForcingCanvas);
+                case "Step"
+                    obj.ActiveSetupPanel = StepPanel(obj.ForcingCanvas);
+                case "Swept Sine"
+                    obj.ActiveSetupPanel = SweptSinePanel(obj.ForcingCanvas);
+                case "Zero Output"
+                    obj.ActiveSetupPanel = ZeroOutputPanel(obj.ForcingCanvas);
+            end
 
-            % Create AvailableListBoxLabel
-            comp.AvailableListBoxLabel = uilabel(comp.GridLayout);
-            comp.AvailableListBoxLabel.FontWeight = 'bold';
-            comp.AvailableListBoxLabel.Layout.Row = 2;
-            comp.AvailableListBoxLabel.Layout.Column = 1;
-            comp.AvailableListBoxLabel.Text = 'Available';
+            obj.ActiveSetupPanel.ValueChangedCallback = @() obj.fwdValueChangedCallback;
 
-            % Create AvailableListBox
-            comp.AvailableListBox = uilistbox(comp.GridLayout);
-            comp.AvailableListBox.Items = {'Zero Output', 'Ramp', 'Sine', 'Step', 'Swept Sine', 'Custom'};
-            comp.AvailableListBox.Layout.Row = [3 6];
-            comp.AvailableListBox.Layout.Column = 1;
-            comp.AvailableListBox.DoubleClickedFcn = matlab.apps.createCallbackFcn(comp, @AvailableListBoxClicked, true);
-            comp.AvailableListBox.Value = 'Zero Output';
+            obj.ActivePanelName = panelName;
+        end
 
-            % Create OverallListBoxLabel
-            comp.OverallListBoxLabel = uilabel(comp.GridLayout);
-            comp.OverallListBoxLabel.FontWeight = 'bold';
-            comp.OverallListBoxLabel.Layout.Row = 2;
-            comp.OverallListBoxLabel.Layout.Column = 2;
-            comp.OverallListBoxLabel.Text = 'Overall';
+        function signal = getActiveSignal(obj)
+            signal = [];
 
-            % Create OverallListBox
-            comp.OverallListBox = uilistbox(comp.GridLayout);
-            comp.OverallListBox.Items = {};
-            comp.OverallListBox.Layout.Row = [3 6];
-            comp.OverallListBox.Layout.Column = [2 3];
-            comp.OverallListBox.Value = {};
+            if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
+                if ismethod(obj.ActiveSetupPanel, 'createSignal')
+                    signal = obj.ActiveSetupPanel.createSignal();
+                end
+            end
+        end
 
-            % Create AddButton
-            comp.AddButton = uibutton(comp.GridLayout, 'push');
-            comp.AddButton.ButtonPushedFcn = matlab.apps.createCallbackFcn(comp, @AddButtonPushed, true);
-            comp.AddButton.Layout.Row = 7;
-            comp.AddButton.Layout.Column = 2;
-            comp.AddButton.Text = 'Add';
+        function populateActivePanel(obj, signalObj)
+            if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)
+                if ismethod(obj.ActiveSetupPanel, 'populate')
+                    obj.ActiveSetupPanel.populate(signalObj);
+                end
+            end
+        end
+    end
 
-            % Create RemoveButton
-            comp.RemoveButton = uibutton(comp.GridLayout, 'push');
-            comp.RemoveButton.ButtonPushedFcn = matlab.apps.createCallbackFcn(comp, @RemoveButtonPushed, true);
-            comp.RemoveButton.Layout.Row = 7;
-            comp.RemoveButton.Layout.Column = 3;
-            comp.RemoveButton.Text = 'Remove';
+    methods
+        % methods for forwarding the callback function from view to
+        % controller
 
-            % Create ClearButton
-            comp.ClearButton = uibutton(comp.GridLayout, 'push');
-            comp.ClearButton.ButtonPushedFcn = matlab.apps.createCallbackFcn(comp, @ClearButtonPushed, true);
-            comp.ClearButton.Layout.Row = 8;
-            comp.ClearButton.Layout.Column = [2 3];
-            comp.ClearButton.Text = 'Clear';
+        function fwdAddCallback(obj, value)
+            if ~isempty(obj.AddCallbackView)
+                obj.AddCallbackView(value);
+            end
+        end
 
-            % Create ForcingFunctionsLabel
-            comp.ForcingFunctionsLabel = uilabel(comp.GridLayout);
-            comp.ForcingFunctionsLabel.FontSize = 18;
-            comp.ForcingFunctionsLabel.FontWeight = 'bold';
-            comp.ForcingFunctionsLabel.Layout.Row = 1;
-            comp.ForcingFunctionsLabel.Layout.Column = [1 3];
-            comp.ForcingFunctionsLabel.Text = 'Forcing Functions';
+        function fwdRemoveCallback(obj, idx)
+            if ~isempty(obj.RemoveCallbackView)
+                obj.RemoveCallbackView(idx);
+            end
+        end
 
-            % Create FunctionSetupLabel
-            comp.FunctionSetupLabel = uilabel(comp.GridLayout);
-            comp.FunctionSetupLabel.FontSize = 18;
-            comp.FunctionSetupLabel.FontWeight = 'bold';
-            comp.FunctionSetupLabel.Layout.Row = 1;
-            comp.FunctionSetupLabel.Layout.Column = [4 6];
-            comp.FunctionSetupLabel.Text = 'Function Setup';
+        function fwdSelectAvailableCallback(obj, value)
+            if ~isempty(obj.SelectAvailableCallbackView)
+                obj.SelectAvailableCallbackView(value);
+            end
+        end
+
+        function fwdSelectOverallCallback(obj, idx, swapFlag)
+            if ~isempty(obj.SelectOverallCallbackView)
+                obj.SelectOverallCallbackView(idx, swapFlag);
+            end
+        end
+
+        function fwdValueChangedCallback(obj)
+            if ~isempty(obj.ValueChangedCallbackView)
+                obj.ValueChangedCallbackView();
+            end
+        end
+
+        function fwdViewSwitchChangedCallback(obj)
+            if ~isempty(obj.ViewSwitchCallbackView)
+                obj.ViewSwitchCallbackView();
+            end
+        end
+
+        function fwdFinishCallback(obj)
+            if ~isempty(obj.FinishCallbackView)
+                obj.FinishCallbackView
+            end
+        end
+
+        function resetView(obj)
+            obj.OverallListWidget.resetOverallWidget();
+            
+            obj.swapActivePanel('Custom');
         end
     end
 end
+

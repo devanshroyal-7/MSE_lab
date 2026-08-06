@@ -1,21 +1,21 @@
-classdef AppController
-    % Controller of the App. Currently only contains placeholders. 
-
+classdef AppController < handle
     properties
-        Property1
+        Model
+        View
+
     end
 
-    methods
-        function obj = AppController(inputArg1,inputArg2)
-            %UNTITLED Construct an instance of this class
-            %   Detailed explanation goes here
-            obj.Property1 = inputArg1 + inputArg2;
+    methods 
+        function obj = AppController(model, view)
+            obj.Model = model;
+            obj.View = view;
+
+            % Callback
+            obj.View.fwdRunSimCallback = @() handleRunSimCallback();
         end
 
-        function outputArg = method1(obj,inputArg)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
-            outputArg = obj.Property1 + inputArg;
+        function handleRunSimCallback();
+            
         end
     end
 end

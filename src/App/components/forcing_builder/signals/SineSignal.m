@@ -35,7 +35,7 @@ classdef SineSignal < BaseSignal
         function y = evaluate(obj, t)
             y = zeros(size(t));
 
-            idx = (t >= 0) & (t < obj.Duration);
+            idx = (t >= 0) & (t <= obj.Duration);
 
             y(idx) = obj.Amplitude * sin(2 * pi * obj.Frequency * t(idx) + deg2rad(obj.InitPhase));
 
