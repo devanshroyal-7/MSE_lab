@@ -1,6 +1,6 @@
 function tsData = SignalBuilderApp()
-    % app = struct();
-
+    tsData = timeseries();
+    
     fig = uifigure("Name", "Forcing Function Builder", "Position", [500, 500, 940, 630]);
 
     model = SignalBuilderModel();
@@ -8,18 +8,14 @@ function tsData = SignalBuilderApp()
     controller = SignalBuilderController(model, view);
 
     fig.CloseRequestFcn = @(~, ~) cleanupApp(fig, model, view, controller);
-
-    uiwait(fig);
     
-    if isvalid(controller) && controller.IsFinished
+    uiwait(fig);
 
+    if isvalid(controller) && controller.IsFinished
+        
         [t, y] = model.compileCompositeSignal();
 
         tsData = timeseries(y, t);
-        
-        assignin('base', 'sim_input', tsData);
-    else
-        tsData = [];
     end
 
     delete(controller)
