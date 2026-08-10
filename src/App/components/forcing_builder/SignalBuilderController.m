@@ -148,7 +148,7 @@ classdef SignalBuilderController < handle
         function handleFinishCallback(obj)
             obj.IsFinished = true;
 
-            uiresume(obj.View.UIFigure)
+            uiresume(obj.View.UIFigure);
         end
 
         function resetToInitState(obj)
