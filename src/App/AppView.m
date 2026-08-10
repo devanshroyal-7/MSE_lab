@@ -2,6 +2,7 @@ classdef AppView < handle
     % use size [500, 500, 1100, 850]
 
     properties 
+        UIFigure
         MainLayoutGrid
         SimStart
         TabGroup
@@ -18,9 +19,10 @@ classdef AppView < handle
 
     methods
         function obj = AppView(parentContainer)
+            obj.UIFigure = parentContainer;
             obj.MainLayoutGrid = uigridlayout(parentContainer, [10, 10]);
             % obj.MainLayoutGrid.ColumnSpacing = 0;
-            obj.MainLayoutGrid.Padding = [0, 0, 0, 10];
+            obj.MainLayoutGrid.Padding = [0, 0, 10, 0];
             obj.MainLayoutGrid.RowHeight = {60, '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x'};
             obj.MainLayoutGrid.ColumnWidth = {100, '1x', '1x', 100, 100, 100, '1x', '1x', 100, 100};
             
@@ -66,7 +68,16 @@ classdef AppView < handle
             obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
         end
+    
+        function updateReferencePlot(obj, sim_input)
+            t = sim_input.Time;
+            y = sim_input.Data;
+            plot(obj.TimeDomainPanel.ReferencePlot, t, y);
+        end
+    end
 
+    methods
+        % Callback methods
         function handleRunSimCallback(obj)
             if ~isempty(obj.fwdRunSimCallbackView)
                 obj.fwdRunSimCallbackView();
