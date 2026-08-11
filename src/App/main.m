@@ -9,11 +9,11 @@ function main()
 
     fig.CloseRequestFcn = @(~, ~) cleanupApp(fig, model, view, controller);
 
-    uiwait(fig);
-    
-    delete(controller)
-    delete(view)
-    if isvalid(fig),    delete(fig);        end
+    % uiwait(fig);
+    % 
+    % delete(controller)
+    % delete(view)
+    % if isvalid(fig),    delete(fig);        end
 end
 
 function cleanupApp(fig, model, view, controller)
