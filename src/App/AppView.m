@@ -71,7 +71,7 @@ classdef AppView < handle
     
         function updateReferencePlot(obj, sim_input)
             t = sim_input.Time;
-            y = sim_input.Data;
+            y = squeeze(sim_input.Data);
             plot(obj.TimeDomainPanel.ReferencePlot, t, y);
         end
     end
