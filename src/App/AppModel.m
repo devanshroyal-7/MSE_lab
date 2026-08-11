@@ -69,5 +69,13 @@ classdef AppModel < handle
             
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
         end
+
+        function status = getSimulationStatus(obj)
+            if bdIsLoaded(obj.SimulationModelName)
+                status = get_param(obj.SimulationModelName, 'SimulationStatus');
+            else
+                status = 'stopped';
+            end
+        end
     end
 end
