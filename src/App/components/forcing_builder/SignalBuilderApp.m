@@ -9,6 +9,7 @@ function tsData = SignalBuilderApp()
 
     fig.CloseRequestFcn = @(~, ~) cleanupApp(fig, model, view, controller);
     
+    drawnow;
     uiwait(fig);
 
     if isvalid(controller) && controller.IsFinished
