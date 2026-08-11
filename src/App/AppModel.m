@@ -56,6 +56,8 @@ classdef AppModel < handle
             assignin('base', 'b_sim', obj.b_sim);
 
             set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
+
+            drawnow;
         end
 
         function startSimulation(obj)
@@ -76,6 +78,11 @@ classdef AppModel < handle
             else
                 status = 'stopped';
             end
+        end
+
+        function isRunning = isSimulationRunning(obj)
+            status = obj.getSimulationStatus();
+            isRunning = strcmp(status, 'running') || strcmp(status, 'external');
         end
     end
 end
