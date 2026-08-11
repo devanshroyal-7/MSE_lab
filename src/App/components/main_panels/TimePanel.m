@@ -54,5 +54,15 @@ classdef TimePanel < handle
             obj.ReferencePlot.Layout.Column = [1 2];
             obj.ReferencePlot.Layout.Row = 5; 
         end
+
+        function updateReferencePlot(obj, t, y)
+            plot(obj.ReferencePlot, t, y);
+            xlim(obj.ReferencePlot, [0, max(0.1, t(end))]);
+        end
+
+        function updateResponsePlot(obj, t, y)
+            plot(obj.ResponsePlot, t, y);
+            xlim(obj.ResponsePlot, [0, max(0.1, t(end))]);
+        end
     end
 end
