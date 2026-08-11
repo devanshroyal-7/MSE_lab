@@ -17,7 +17,40 @@ classdef AppController < handle
         end
 
         function handleRunSimCallback(obj)
-            obj.Model.startSimulation();
+            figHandle = obj.View.UIFigure;
+
+            try
+                d = uiprogressdlg(figHandle, ...
+                    "Title", "Simulink Desktop-Real Time", ...
+                    "Message", "Compiling C code & connecting to real-time target...", ...
+                    "Indeterminate", "on");
+                drawnow;
+
+                obj.Model.startSimulation();
+                
+                while true
+                    if obj.Model.isSimulationRunning() || strcmp(obj.Model.getSimulationStatus(), 'stopped')
+                        break;
+                    end
+
+                    pause(0.1)
+                end
+
+                close(d);
+
+                if obj.Model.isSimulationRunning()
+                    disp('Simulation is running')
+                    % start(obj.StreamingTimer)
+                else
+                    errordlg("Model failed to enter real-time execution", "Target Error");
+                end
+
+            catch ME
+                if exist('d', 'var') && isvalid(d)
+                    close(d);
+                end 
+                errordlg(ME.message, 'Simulation Launch Failed');
+            end
         end
 
         function handleSignalBuilderCallback(obj)
