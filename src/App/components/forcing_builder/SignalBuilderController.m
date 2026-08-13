@@ -13,6 +13,7 @@ classdef SignalBuilderController < handle
         function obj = SignalBuilderController(model, view)
             obj.Model = model;
             obj.View = view;
+            obj.View.ForceLimit = obj.Model.ForceLimit;
 
             obj.ModelListeners = addlistener(obj.Model, 'DataUpdated', @(~, ~) obj.handleModelUpdated);
             % obj.ViewListeners = addlistener(obj.View, 'ViewUpdated', @(~, ~) obj.handleViewUpdated);
@@ -134,8 +135,15 @@ classdef SignalBuilderController < handle
         end
 
         function handleFinishCallback(obj)
-            obj.IsFinished = true;
+            [~, y] = obj.Model.compileCompositeSignal();
+            if obj.Model.exceedsForceLimit(y)
+                uialert(obj.View.UIFigure, ...
+                    "Can't set the provided forcing function because it exceeds the limits.", ...
+                    "Limit Exceeded", "Icon", "error");
+                return;
+            end
 
+            obj.IsFinished = true;
             uiresume(obj.View.UIFigure)
         end
 

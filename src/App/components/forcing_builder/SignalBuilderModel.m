@@ -23,6 +23,10 @@ classdef SignalBuilderModel < handle
         Signals = {}
         SampleRate = 1000
     end
+
+    properties (Constant)
+        ForceLimit = 3  % [N]
+    end
     
     properties (Dependent)
         TotalDuration
@@ -97,6 +101,10 @@ classdef SignalBuilderModel < handle
 
             t = 0:dt:SigObject.TotalDuration;
             y = SigObject.evaluate(t);
+        end
+
+        function tf = exceedsForceLimit(obj, y)
+            tf = ~isempty(y) && any(abs(y) > obj.ForceLimit);
         end
 
         function resetModel(obj)

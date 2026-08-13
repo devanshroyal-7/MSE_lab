@@ -14,6 +14,7 @@ classdef SignalBuilderView < handle
         ForcingCanvas
         PanelAdditional
         AdditionalSetup
+        ForceLimit = 3  % [N], copied from SignalBuilderModel
 
         % View Callback functions % these callbacks pass it from overall panel to
         % the SignalBuilderController
@@ -103,6 +104,13 @@ classdef SignalBuilderView < handle
     methods
         function updatePlot(obj, t, y)
             plot(obj.Plot, t, y);
+            hold(obj.Plot, "on");
+            yline(obj.Plot, obj.ForceLimit, "r", "LineWidth", 3);
+            yline(obj.Plot, -obj.ForceLimit, "r", "LineWidth", 3);
+            hold(obj.Plot, "off");
+
+            yl = ylim(obj.Plot);
+            ylim(obj.Plot, [min(yl(1), -obj.ForceLimit), max(yl(2), obj.ForceLimit)]);
         end
 
         function swapActivePanel(obj, panelName)
