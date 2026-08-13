@@ -29,7 +29,7 @@ classdef RampSignal < BaseSignal
     methods
         function obj = RampSignal (slope, duration, dwell_t, dwell_loc, twosided, mirrored)
             % default values
-            if nargin < 1, slope        = 1.0; end
+            if nargin < 1, slope        = 0.2; end
             if nargin < 2, duration     = 10.0; end
             if nargin < 3, dwell_t      = 0.0; end
             if nargin < 4, dwell_loc    = "beginning"; end

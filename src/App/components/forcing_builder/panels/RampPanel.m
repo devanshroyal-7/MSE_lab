@@ -31,7 +31,7 @@ classdef RampPanel < handle
 
             % Render standard fields
             uilabel(obj.MainLayoutGrid, 'Text', 'Slope (N/s):');
-            obj.SlopeEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0.4);
+            obj.SlopeEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0.2);
             obj.SlopeEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
             uilabel(obj.MainLayoutGrid, 'Text', 'Duration (s):');
