@@ -1,24 +1,39 @@
 function main()
-    % Entry point for the MSE lab app. Wires AppModel / AppView / AppController.
-    % AppView currently expects a parent uifigure; pass one before this stub is complete.
+    % Entry point for the MSE lab app. Builds a figure, then wires
+    % AppModel / AppView / AppController. CloseRequestFcn tears them down.
     %
     %{
-    Example usage (intended, once the view takes a figure):
+    Example usage (from MATLAB, with src/App on the path):
 
-    >> fig = uifigure("Name", "MSE Lab", "Position", [500, 500, 1100, 850]);
+    >> main
+
+    % Or construct the pieces yourself:
+    >> fig = uifigure("Name", "MSE Lab", "Position", [500, 500, 1900, 900]);
     >> model = AppModel();
     >> view = AppView(fig);
     >> controller = AppController(model, view);
 
-    Forcing functions are built separately with SignalBuilderApp.
+    Create Forcing Function on the sidebar opens SignalBuilderApp.
 
     %}
 
     delete(timerfindall);             % close any leftover timers from a previous run
 
-    model       = AppModel();
-    view        = AppView();
-    controller  = AppController();
+    fig = uifigure("Name", "Mechanical System Experimenation App", "Position", [500, 500, 1900, 900]);
 
-    assignin('base', 'mse_app_controllers', controller);  % keep a handle alive in the MATLAB workspace
+    model       = AppModel();
+    view        = AppView(fig);
+    controller  = AppController(model, view);
+
+    fig.CloseRequestFcn = @(~, ~) cleanupApp(fig, model, view, controller);
+
+    % uiwait is intentionally omitted so the Command Window stays usable
+    % while the figure is open. Close the window to run cleanupApp.
+end
+
+function cleanupApp(fig, model, view, controller)
+    if isvalid(controller), delete(controller); end
+    if isvalid(model),      delete(model);      end
+    if isvalid(view),       delete(view);       end
+    if isvalid(fig),        delete(fig);        end
 end

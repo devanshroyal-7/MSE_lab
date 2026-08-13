@@ -52,6 +52,11 @@ classdef AppModel < handle
             if ~bdIsLoaded(obj.SimulationModelName)
                 load_system(obj.SimulationModelName)
             end
+            % MSE_PLANT reads hardware conversion constants from 'base'
+            assignin('base', "T", obj.T);
+            assignin('base', "r", obj.r);
+            assignin('base', "Kt", obj.Kt);
+            assignin('base', "motor_eff", obj.motor_eff);
         end
 
         function setForcingInput(obj, tsInput)
@@ -64,6 +69,8 @@ classdef AppModel < handle
             assignin('base', 'b_sim', obj.b_sim);
 
             set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
+
+            drawnow;
         end
 
         function startSimulation(obj)
@@ -75,7 +82,20 @@ classdef AppModel < handle
             % Desktop Real-Time / external mode; plant reads sim_input from base
             set_param(obj.SimulationModelName, 'SimulationMode', 'external');
             
-            set_param(obj.SimulationModelName, 'SimulaitonCommand', 'start');
+            set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
+        end
+
+        function status = getSimulationStatus(obj)
+            if bdIsLoaded(obj.SimulationModelName)
+                status = get_param(obj.SimulationModelName, 'SimulationStatus');
+            else
+                status = 'stopped';
+            end
+        end
+
+        function isRunning = isSimulationRunning(obj)
+            status = obj.getSimulationStatus();
+            isRunning = strcmp(status, 'running') || strcmp(status, 'external');
         end
     end
 end

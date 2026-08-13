@@ -1,6 +1,7 @@
 function tsData = SignalBuilderApp()
     % Standalone forcing-function UI. Blocks until Finish or the figure is closed.
-    % On Finish, returns a timeseries and also assigns it to base as sim_input.
+    % On Finish, returns a timeseries. Closed without Finish returns an empty
+    % timeseries (Length == 0). The main app copies that into sim_input.
     %
     %{
     Example usage:
@@ -9,11 +10,11 @@ function tsData = SignalBuilderApp()
     >> plot(tsData);
 
     % Closed without Finish:
-    >> isempty(tsData)                % true
+    >> tsData.Length                  % 0
 
     %}
 
-    % app = struct();
+    tsData = timeseries();
 
     fig = uifigure("Name", "Forcing Function Builder", "Position", [500, 500, 940, 630]);
 
@@ -23,17 +24,14 @@ function tsData = SignalBuilderApp()
 
     fig.CloseRequestFcn = @(~, ~) cleanupApp(fig, model, view, controller);
 
+    drawnow;
     uiwait(fig);    % returns after Finish (uiresume) or CloseRequestFcn
-    
+
     if isvalid(controller) && controller.IsFinished
 
         [t, y] = model.compileCompositeSignal();
 
         tsData = timeseries(y, t);
-        
-        assignin('base', 'sim_input', tsData);
-    else
-        tsData = [];
     end
 
     delete(controller)
