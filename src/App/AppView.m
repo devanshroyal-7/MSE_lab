@@ -1,5 +1,16 @@
 classdef AppView < handle
-    % use size [500, 500, 1100, 850]
+    % Main MSE app window: title, Time/Frequency/Controls tabs, sidebar.
+    % Recommended figure size: [500, 500, 1900, 900] (see main.m).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [500, 500, 1900, 900]);
+    >> view = AppView(fig);
+    >> view.updateReferencePlot(timeseries(y, t));
+    >> view.FreqDomainPanel.AxFRF          % FRF axes
+
+    %}
 
     properties 
         UIFigure
@@ -55,7 +66,7 @@ classdef AppView < handle
             FrequencyTab = uitab(obj.TabGroup, "Title", "Freuqency");
             obj.FreqDomainPanel = FrequencyPanel(FrequencyTab);
 
-            % Controls
+            % Controls tab is a placeholder; live sim controls are on SidebarPanel
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
             
             SidePanel = uipanel(obj.MainLayoutGrid);

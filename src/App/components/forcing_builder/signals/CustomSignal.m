@@ -1,5 +1,15 @@
 classdef CustomSignal < BaseSignal
-    % Subclass for Custom Signal
+    % User expression in t, e.g. "sin(2*t)". vectorize() turns * / ^ into
+    % element-wise ops so the expression works on a time vector.
+    %
+    %{
+    Example usage:
+
+    >> sig = CustomSignal("sin(2*pi*t) + 0.1*t", 5);
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));
+
+    %}
 
     properties
         Name = "Custom"
@@ -33,7 +43,7 @@ classdef CustomSignal < BaseSignal
             t_active = t(activeMask);
 
             try
-                safeExpr = vectorize(obj.Expression);
+                safeExpr = vectorize(obj.Expression);   % * / ^  ->  .* ./ .^
 
                 mathFunc = str2func("@(t) " + safeExpr);
 

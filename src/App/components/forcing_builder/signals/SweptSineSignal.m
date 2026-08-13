@@ -1,5 +1,15 @@
 classdef SweptSineSignal < BaseSignal
-    % Subclass for Swept Sine Signal for modal analysis
+    % Linear chirp from StartFrequency to EndFrequency over Duration (modal tests).
+    % Uses MATLAB chirp(); Offset is added on the active window.
+    %
+    %{
+    Example usage:
+
+    >> sig = SweptSineSignal(1.6, 1, 20, 15);  % A [N], f0 [Hz], f1 [Hz], duration [s]
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));
+
+    %}
 
     properties
         Name = "Swept Sine"

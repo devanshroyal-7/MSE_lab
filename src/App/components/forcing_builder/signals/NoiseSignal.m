@@ -1,5 +1,16 @@
 classdef NoiseSignal < BaseSignal
-    % Subclass for Noise Signal
+    % Band-limited Gaussian noise. White noise is FFT-filtered with a brick-wall
+    % passband [LowerFrequency, UpperFrequency], then scaled to Amplitude RMS.
+    % Seed makes the realization repeatable.
+    %
+    %{
+    Example usage:
+
+    >> sig = NoiseSignal(1, 1, 10, 10, 42);  % A, f_lo, f_hi, duration, seed
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));
+
+    %}
 
     properties
         Name = "Noise"
@@ -41,7 +52,7 @@ classdef NoiseSignal < BaseSignal
             activeMask = (t >= 0) & (t <= obj.Duration);
             t_active = t(activeMask);
 
-            if isempty(t_active) || length(t_active) < 4    % 4 for frequency domain mirroring
+            if isempty(t_active) || length(t_active) < 4    % FFT conjugate symmetry needs >= 4 samples
                 return;
             end
 

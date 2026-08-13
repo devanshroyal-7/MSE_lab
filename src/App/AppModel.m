@@ -1,4 +1,16 @@
 classdef AppModel < handle
+    % Application model: loads MSE_PLANT and feeds forcing / sim parameters
+    % into the MATLAB base workspace so Desktop Real-Time can read them.
+    %
+    %{
+    Example usage:
+
+    >> ts = SignalBuilderApp;             % or timeseries(y, t) from a model
+    >> model = AppModel;                  % load_system('MSE_PLANT')
+    >> model.setForcingInput(ts);         % also sets StopTime and sim_input
+    >> model.startSimulation;             % external (SLDRT) mode
+
+    %}
 
     % Public properties that correspond to the Simulink model
     properties (Access = public, Transient)
@@ -40,6 +52,7 @@ classdef AppModel < handle
             if ~bdIsLoaded(obj.SimulationModelName)
                 load_system(obj.SimulationModelName)
             end
+            % MSE_PLANT reads hardware conversion constants from 'base'
             assignin('base', "T", obj.T);
             assignin('base', "r", obj.r);
             assignin('base', "Kt", obj.Kt);
@@ -50,7 +63,7 @@ classdef AppModel < handle
             obj.ForcingSignal = tsInput;
             obj.S = tsInput.Time(end);
 
-            % push to base workspace
+            % MSE_PLANT From Workspace / Gain blocks read these from 'base'
             assignin('base', 'sim_input', tsInput);
             assignin('base', 'k_sim', obj.k_sim);
             assignin('base', 'b_sim', obj.b_sim);
@@ -66,7 +79,7 @@ classdef AppModel < handle
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
             
-            % set simulation mode to slrdt
+            % Desktop Real-Time / external mode; plant reads sim_input from base
             set_param(obj.SimulationModelName, 'SimulationMode', 'external');
             
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');

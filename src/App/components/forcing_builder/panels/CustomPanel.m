@@ -1,4 +1,18 @@
 classdef CustomPanel < handle
+    % Function-setup UI for CustomSignal. Lamp is green if F(t) evaluates
+    % numerically at t = 1. populate / createSignal are the panel contract.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = CustomPanel(fig);
+    >> panel.CustomEditField.Value = "sin(2*t)";
+    >> sig = panel.createSignal;
+    >> panel.populate(CustomSignal("0*t", 2));
+
+    %}
+
     properties
        MainLayoutGrid
        CustomLabel

@@ -1,5 +1,17 @@
 classdef (Abstract) BaseSignal < handle
-    % Subclass for Sine Signal
+    % Abstract forcing signal. Concrete subclasses implement evaluate(t).
+    % Offset / DelayBefore / DelayAfter / Repeat are shared fields; only Offset
+    % is applied in evaluate() today. Delay and Repeat are reserved for sequencing.
+    %
+    %{
+    Example usage (any subclass):
+
+    >> sig = SineSignal(1, 2, 0, 5);  % amplitude, Hz, phase deg, duration
+    >> t = 0:0.001:sig.TotalDuration;
+    >> y = sig.evaluate(t);
+    >> plot(t, y);
+
+    %}
 
     properties (Abstract)
         Name        % string: Display name for the "Overall" function

@@ -1,5 +1,14 @@
 classdef SineSignal < BaseSignal
-    % Subclass for Sine Signal
+    % Harmonic force: y = A * sin(2*pi*f*t + phi) + Offset, for 0 <= t < Duration.
+    %
+    %{
+    Example usage:
+
+    >> sig = SineSignal(1.5, 2, 90, 5);   % A [N], f [Hz], phase [deg], duration [s]
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));
+
+    %}
 
     properties
         Name = "Sine"

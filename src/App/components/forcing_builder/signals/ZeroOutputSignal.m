@@ -1,5 +1,15 @@
 classdef ZeroOutputSignal < BaseSignal
-    % zero output signal for steady state analysis
+    % Zero force for Duration seconds (settle / steady-state). Offset, if set,
+    % is applied only inside the active window.
+    %
+    %{
+    Example usage:
+
+    >> sig = ZeroOutputSignal(10);
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));      % all zeros unless Offset ~= 0
+
+    %}
 
     properties
         Name = "Zero Output"

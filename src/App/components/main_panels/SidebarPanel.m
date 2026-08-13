@@ -1,4 +1,18 @@
-classdef SidebarPanel < handle 
+classdef SidebarPanel < handle
+    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, PID gains,
+    % Create Forcing Function, and Save Outputs. Start and Create Forcing
+    % Function forward to AppView; enable toggles only change their own color.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 320, 640]);
+    >> panel = SidebarPanel(fig);
+    >> panel.KSimEditField.Value = 200;
+    >> panel.fwdRunSignalCallback = @() disp("start");
+
+    %}
+
     properties
         MainLayoutGrid
         

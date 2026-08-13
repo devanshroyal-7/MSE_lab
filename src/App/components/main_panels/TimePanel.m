@@ -1,4 +1,18 @@
 classdef TimePanel < handle
+    % Time-domain tab: measured response axes above, reference/forcing axes below.
+    % OverlayCheckBox is meant to draw the reference on the response plot.
+    % updateReferencePlot / updateResponsePlot write cached line handles.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 800, 700]);
+    >> panel = TimePanel(fig);
+    >> panel.updateReferencePlot(t, f);
+    >> panel.updateResponsePlot(t, x);
+
+    %}
+
     properties
         MainLayoutGrid
         ResponseLabel
@@ -6,9 +20,9 @@ classdef TimePanel < handle
         ReferenceLabel
         ReferencePlot
         OverlayCheckBox
-        SignalButton
+        SignalButton          % reserved; not created in the constructor yet
 
-        % Cached line handles for zero allocation streaming
+        % Cached line handles so streaming can set XData/YData without new plot()
         RefLineHandle
         RespLineHandle
     end

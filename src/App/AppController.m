@@ -1,4 +1,18 @@
 classdef AppController < handle
+    % Glue between AppModel and AppView. Start Simulation compiles/connects
+    % Desktop Real-Time; Create Forcing Function opens SignalBuilderApp and
+    % draws the result on the reference plot. Save Output is still a stub.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [500, 500, 1900, 900]);
+    >> model = AppModel;
+    >> view = AppView(fig);
+    >> controller = AppController(model, view);
+
+    %}
+
     properties
         Model
         View

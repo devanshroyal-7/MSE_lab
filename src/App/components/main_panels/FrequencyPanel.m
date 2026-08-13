@@ -1,4 +1,18 @@
 classdef FrequencyPanel < handle
+    % Frequency-domain tab: FFT of forcing, FFT of response, then FRF (m/N).
+    % Axes are empty until the controller writes spectra after a run.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 800, 700]);
+    >> panel = FrequencyPanel(fig);
+    >> plot(panel.AxForcing, freq, magF);
+    >> plot(panel.AxResponse, freq, magX);
+    >> plot(panel.AxFRF, freq, magX ./ magF);
+
+    %}
+
     properties
         MainLayoutGrid
         ForcingLabel
