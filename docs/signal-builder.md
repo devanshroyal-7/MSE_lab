@@ -10,7 +10,7 @@ tsData = SignalBuilderApp;    % blocks until Finish or the window is closed
 plot(tsData);
 ```
 
-On **Finish Signal Building**, `tsData` is the superimposed force and `sim_input` is assigned in the base workspace. Closing the figure without Finish returns `[]`.
+On **Finish Signal Building**, `tsData` is the superimposed force. Closing without Finish returns an empty `timeseries` (`Length == 0`). The main app's `AppController` then calls `AppModel.setForcingInput`, which writes `sim_input` in the base workspace.
 
 To drive the widgets from code instead of the full app:
 

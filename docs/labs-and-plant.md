@@ -7,7 +7,6 @@ Course experiments and the Simulink model that talks to the EMB SMD hardware.
 | File | Role |
 | --- | --- |
 | `MSE_PLANT.slx` | Desktop Real-Time plant. Run in **external** mode with the kit connected. |
-| `MSE_App.mlapp` | App Designer shell for the student app. Programmatic UI is under `src/App/`. |
 | `Lab_1.mlx` | Live script for Lab 1 (open this in MATLAB, not the `.m` export). |
 | `lab_1.m` | Export of Lab 1 with embedded figure output. Very large; prefer the `.mlx`. |
 | `lab_3.m` | Lab 3 harmonic / sine-sweep experiments (same plant contract). |
