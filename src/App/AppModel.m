@@ -78,23 +78,26 @@ classdef AppModel < handle
             % Stop any leftover kernel app, rebuild so checksums match, then
             % connect without starting the run.
             modelName = char(obj.SimulationModelName);
-
-            if bdIsLoaded(modelName)
-                try
-                    set_param(modelName, 'SimulationCommand', 'stop');
-                catch
-                end
-            end
+            % 
+            % if bdIsLoaded(modelName)
+            %     try
+            %         set_param(modelName, 'SimulationCommand', 'stop');
+            %     catch
+            %     end
+            % end
 
             set_param(modelName, 'SimulationMode', 'external');
 
             try
-                slbuild(modelName);
+                % slbuild(modelName);
+                set_param(modelName, 'SimulationCommand', 'connect');
             catch
-                rtwbuild(modelName);
+                % rtwbuild(modelName);
+                obj.rebuildTarget(modelName);
+                set_param(modelName, 'SimulationCommand', 'connect');
             end
 
-            set_param(modelName, 'SimulationCommand', 'connect');
+            % set_param(modelName, 'SimulationCommand', 'connect');
         end
 
         function startSimulation(obj)
@@ -142,6 +145,16 @@ classdef AppModel < handle
         function isRunning = isSimulationRunning(obj)
             status = obj.getSimulationStatus();
             isRunning = strcmp(status, 'running') || strcmp(status, 'external');
+        end
+    end
+
+    methods (Access = private)
+        function rebuildTarget(obj, modelName)
+            try
+                slbuild(modelName);
+            catch
+                rtwbuild(modelName);
+            end
         end
     end
 end
