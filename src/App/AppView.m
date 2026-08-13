@@ -114,7 +114,7 @@ classdef AppView < handle
         end
 
         function handleSaveOutputCallback(obj)
-            if ~isempty(obj.fwdSaveOutputCallbackView())
+            if ~isempty(obj.fwdSaveOutputCallbackView)
                 obj.fwdSaveOutputCallbackView();
             end
         end
