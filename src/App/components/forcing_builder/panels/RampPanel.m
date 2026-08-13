@@ -1,4 +1,16 @@
 classdef RampPanel < handle
+    % Function-setup UI for RampSignal (slope, duration, dwell, two-sided, mirror).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = RampPanel(fig);
+    >> sig = panel.createSignal;
+    >> panel.populate(RampSignal(0.4, 10, 0, "beginning", false, false));
+
+    %}
+
     properties
         MainLayoutGrid
         SlopeEditField

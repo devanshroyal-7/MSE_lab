@@ -1,4 +1,18 @@
 classdef SignalBuilderController < handle
+    % Wires SignalBuilderView events to SignalBuilderModel and keeps the plot
+    % in sync (single signal vs superimposed overall).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Name", "Forcing Function Builder", "Position", [500, 500, 940, 630]);
+    >> model = SignalBuilderModel;
+    >> view = SignalBuilderView(fig);
+    >> controller = SignalBuilderController(model, view);
+    >> uiwait(fig);                   % or call SignalBuilderApp instead
+
+    %}
+
     properties
         Model
         View
@@ -117,7 +131,7 @@ classdef SignalBuilderController < handle
         end
 
         function handleValueChangedCallback(obj)
-            % trigger plot update if editfield changes
+            % Live-edit: replace the selected stacked signal with the panel's current values.
             if strcmp(obj.View.OverallListWidget.OverallMode, 'overall')
                 updatedSignal = obj.View.getActiveSignal();
                 
@@ -136,7 +150,7 @@ classdef SignalBuilderController < handle
         function handleFinishCallback(obj)
             obj.IsFinished = true;
 
-            uiresume(obj.View.UIFigure)
+            uiresume(obj.View.UIFigure)   % unblocks SignalBuilderApp's uiwait
         end
 
         function resetToInitState(obj)

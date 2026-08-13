@@ -1,4 +1,17 @@
 classdef AdditionalPanel < handle
+    % Offset / delay / dwell / repeat fields plus Finish. Values are collected
+    % here but not yet copied onto BaseSignal by the controller.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = AdditionalPanel(fig);
+    >> panel.FinishCallback = @() disp("done");
+    >> panel.OffsetEditField.Value
+
+    %}
+
     properties
         MainLayoutGrid
         OffsetLabel

@@ -1,4 +1,18 @@
-classdef SidebarPanel < handle 
+classdef SidebarPanel < handle
+    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, and PID gains.
+    % Enable buttons only toggle their own label/color so far; wiring to
+    % AppModel is still in AppController.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 320, 640]);
+    >> panel = SidebarPanel(fig);
+    >> panel.KSimEditField.Value = 200;
+    >> panel.SimStartButton      % ButtonPushedFcn -> runSimCallback (stub)
+
+    %}
+
     properties
         MainLayoutGrid
         

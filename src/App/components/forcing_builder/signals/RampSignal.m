@@ -1,5 +1,16 @@
 classdef RampSignal < BaseSignal
-    % Subclass for Ramp Signal
+    % Linear ramp of Slope [N/s] over Duration. Optional dwell, two-sided
+    % (up then down), and mirrored (repeat with opposite sign). Legs stack
+    % in time; TotalDuration = num_legs * Duration + DwellTime.
+    %
+    %{
+    Example usage:
+
+    >> sig = RampSignal(0.4, 10, 1, "beginning", true, true);
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));
+
+    %}
 
     properties
         Name = "Ramp"
@@ -57,11 +68,13 @@ classdef RampSignal < BaseSignal
             y(idx1) = t_rel(idx1) * obj.Slope;
 
             if obj.TwoSided
+                % Second leg: return to 0 over another Duration
                 idx2 = (t_rel >= L) & (t_rel <= 2*L);
                 y(idx2) = (2*L - t_rel(idx2)) * obj.Slope;
             end
 
             if obj.Mirrored
+                % Repeat the preceding shape with opposite sign
                 if obj.TwoSided
                     idx3 = (t_rel >= 2*L) & (t_rel < 3*L);
                     idx4 = (t_rel >= 3*L) & (t_rel < 4*L);

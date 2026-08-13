@@ -1,4 +1,16 @@
 classdef SweptSinePanel < handle
+    % Function-setup UI for SweptSineSignal (amplitude, start/end Hz, duration).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = SweptSinePanel(fig);
+    >> sig = panel.createSignal;
+    >> panel.populate(SweptSineSignal(1.6, 1, 20, 15));
+
+    %}
+
     properties
         MainLayoutGrid
         AmpEditField
