@@ -31,7 +31,7 @@ classdef AdditionalPanel < handle
 
     methods
         function obj = AdditionalPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [4, 2]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [6, 2]);
             obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 45, 30};
             obj.MainLayoutGrid.ColumnWidth = {130, '1x'};
 
@@ -53,6 +53,13 @@ classdef AdditionalPanel < handle
             obj.RepeatEditField = uieditfield(obj.MainLayoutGrid, 'numeric', ...
                 'Value', 1, 'Limits', [0, Inf], 'RoundFractionalValues', 'on');
             obj.RepeatEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
+
+            hintlabel = uilabel(obj.MainLayoutGrid, ...
+                "Text", "*Switch to overall view to see changes", ...
+                "FontSize", 10, ...
+                "HorizontalAlignment", 'right');
+            hintlabel.Layout.Column = [1, 2];
+            hintlabel.Layout.Row = 5;
 
             obj.FinishButton = uibutton(obj.MainLayoutGrid, "Text", "Finish Signal Building");
             obj.FinishButton.Layout.Column = [1, 2];
