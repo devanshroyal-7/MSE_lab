@@ -33,6 +33,7 @@ classdef AppModel < handle
 
         % Simulation control and configuration
         SimulationModelName (1,1) string = "MSE_PLANT";
+        RunTimeout (1,1) double = 30;   % [s] hard cap so the UI cannot deadlock
         
         S   (1,1) double {mustBeNumeric} = 10;  % simulation time   [s]
         TimeBuffer      (1,:) double = [];
@@ -73,16 +74,44 @@ classdef AppModel < handle
             drawnow;
         end
 
+        function connectTarget(obj)
+            % Build and connect to the real-time target without starting the run.
+            set_param(obj.SimulationModelName, 'SimulationMode', 'external');
+            set_param(obj.SimulationModelName, 'SimulationCommand', 'connect');
+        end
+
         function startSimulation(obj)
             % clear up buffer
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
-            
-            % Desktop Real-Time / external mode; plant reads sim_input from base
-            set_param(obj.SimulationModelName, 'SimulationMode', 'external');
-            
+
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
+        end
+
+        function stopSimulation(obj)
+            if bdIsLoaded(obj.SimulationModelName)
+                set_param(obj.SimulationModelName, 'SimulationCommand', 'stop');
+            end
+        end
+
+        function run = collectRunData(obj)
+            names = [ ...
+                "rt_time", "f_input", ...
+                "cart1_position", "cart2_position", ...
+                "cart1_velocity", "cart2_velocity", ...
+                "sim_input", "k_sim", "b_sim", ...
+                "T", "r", "Kt", "motor_eff"];
+
+            run = struct();
+            run.saved_at = datetime("now");
+
+            for i = 1:numel(names)
+                name = char(names(i));
+                if evalin('base', ['exist(''' name ''', ''var'')'])
+                    run.(name) = evalin('base', name);
+                end
+            end
         end
 
         function status = getSimulationStatus(obj)

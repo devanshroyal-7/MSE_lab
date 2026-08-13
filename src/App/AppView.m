@@ -85,6 +85,30 @@ classdef AppView < handle
             y = squeeze(sim_input.Data);
             obj.TimeDomainPanel.updateReferencePlot(t, y);
         end
+
+        function updateResponsePlot(obj, t, y)
+            obj.TimeDomainPanel.updateResponsePlot(t, y);
+        end
+
+        function setSimLampRunning(obj, isRunning)
+            obj.Sidebar.setSimLampRunning(isRunning);
+        end
+
+        function setAppEnabled(obj, tf)
+            if tf
+                enableVal = 'on';
+            else
+                enableVal = 'off';
+            end
+
+            handles = findall(obj.UIFigure, '-property', 'Enable');
+            lamp = obj.Sidebar.SimLamp;
+            for i = 1:numel(handles)
+                if handles(i) ~= lamp
+                    handles(i).Enable = enableVal;
+                end
+            end
+        end
     end
 
     methods

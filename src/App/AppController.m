@@ -1,7 +1,7 @@
 classdef AppController < handle
     % Glue between AppModel and AppView. Start Simulation compiles/connects
-    % Desktop Real-Time; Create Forcing Function opens SignalBuilderApp and
-    % draws the result on the reference plot. Save Output is still a stub.
+    % Desktop Real-Time and waits until stop or a 30 s timeout. Create Forcing
+    % Function opens SignalBuilderApp. Save Output writes a .mat of logged data.
     %
     %{
     Example usage:
@@ -32,6 +32,11 @@ classdef AppController < handle
 
         function handleRunSimCallback(obj)
             figHandle = obj.View.UIFigure;
+            timeout_s = obj.Model.RunTimeout;
+            d = [];
+
+            obj.View.setAppEnabled(false);
+            obj.View.setSimLampRunning(true);
 
             try
                 d = uiprogressdlg(figHandle, ...
@@ -40,31 +45,44 @@ classdef AppController < handle
                     "Indeterminate", "on");
                 drawnow;
 
-                obj.Model.startSimulation();
-                
-                while true
-                    if obj.Model.isSimulationRunning() || strcmp(obj.Model.getSimulationStatus(), 'stopped')
-                        break;
-                    end
+                t0 = tic;
+                obj.Model.connectTarget();
 
-                    pause(0.1)
+                while strcmp(obj.Model.getSimulationStatus(), 'stopped') && toc(t0) < timeout_s
+                    pause(0.1);
+                    drawnow;
                 end
 
                 close(d);
+                d = [];
 
-                if obj.Model.isSimulationRunning()
-                    disp('Simulation is running')
-                    % start(obj.StreamingTimer)
-                else
+                if strcmp(obj.Model.getSimulationStatus(), 'stopped')
                     errordlg("Model failed to enter real-time execution", "Target Error");
+                else
+                    obj.Model.startSimulation();
+
+                    while obj.Model.isSimulationRunning() && toc(t0) < timeout_s
+                        pause(0.1);
+                        drawnow;
+                    end
+
+                    if obj.Model.isSimulationRunning()
+                        obj.Model.stopSimulation();
+                    end
+
+                    pause(0.2);
+                    obj.plotLoggedResponse();
                 end
 
             catch ME
-                if exist('d', 'var') && isvalid(d)
+                if ~isempty(d) && isvalid(d)
                     close(d);
-                end 
+                end
                 errordlg(ME.message, 'Simulation Launch Failed');
             end
+
+            obj.View.setSimLampRunning(false);
+            obj.View.setAppEnabled(true);
         end
 
         function handleSignalBuilderCallback(obj)
@@ -84,7 +102,26 @@ classdef AppController < handle
         end
 
         function handleSaveOutputCallback(obj)
-            % obj
+            [file, path] = uiputfile('*.mat', 'Save run data');
+            if isequal(file, 0)
+                return;
+            end
+
+            run = obj.Model.collectRunData();
+            save(fullfile(path, file), 'run');
+        end
+    end
+
+    methods (Access = private)
+        function plotLoggedResponse(obj)
+            if ~evalin('base', "exist('rt_time', 'var')") || ...
+                    ~evalin('base', "exist('cart1_position', 'var')")
+                return;
+            end
+
+            t = squeeze(evalin('base', 'rt_time'));
+            y = squeeze(evalin('base', 'cart1_position'));
+            obj.View.updateResponsePlot(t, y);
         end
     end
 end
