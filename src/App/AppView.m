@@ -95,19 +95,7 @@ classdef AppView < handle
         end
 
         function setAppEnabled(obj, tf)
-            if tf
-                enableVal = 'on';
-            else
-                enableVal = 'off';
-            end
-
-            handles = findall(obj.UIFigure, '-property', 'Enable');
-            lamp = obj.Sidebar.SimLamp;
-            for i = 1:numel(handles)
-                if handles(i) ~= lamp
-                    handles(i).Enable = enableVal;
-                end
-            end
+            obj.Sidebar.setActionButtonsEnabled(tf);
         end
     end
 

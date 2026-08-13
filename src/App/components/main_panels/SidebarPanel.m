@@ -231,5 +231,19 @@ classdef SidebarPanel < handle
                 obj.SimLamp.Color = [0 1 0];
             end
         end
+
+        function setActionButtonsEnabled(obj, tf)
+            if tf
+                enableVal = 'on';
+            else
+                enableVal = 'off';
+            end
+
+            obj.SimStartButton.Enable = enableVal;
+            obj.CreateFcnButton.Enable = enableVal;
+            obj.SaveOutputButton.Enable = enableVal;
+            obj.EnableSimParamButton.Enable = enableVal;
+            obj.EnableControlsButton.Enable = enableVal;
+        end
     end
 end
