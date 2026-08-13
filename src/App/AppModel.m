@@ -75,9 +75,26 @@ classdef AppModel < handle
         end
 
         function connectTarget(obj)
-            % Build and connect to the real-time target without starting the run.
-            set_param(obj.SimulationModelName, 'SimulationMode', 'external');
-            set_param(obj.SimulationModelName, 'SimulationCommand', 'connect');
+            % Stop any leftover kernel app, rebuild so checksums match, then
+            % connect without starting the run.
+            modelName = char(obj.SimulationModelName);
+
+            if bdIsLoaded(modelName)
+                try
+                    set_param(modelName, 'SimulationCommand', 'stop');
+                catch
+                end
+            end
+
+            set_param(modelName, 'SimulationMode', 'external');
+
+            try
+                slbuild(modelName);
+            catch
+                rtwbuild(modelName);
+            end
+
+            set_param(modelName, 'SimulationCommand', 'connect');
         end
 
         function startSimulation(obj)
