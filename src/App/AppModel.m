@@ -40,6 +40,11 @@ classdef AppModel < handle
         PositionBuffer  (1,:) double = [];
         VelocityBuffer  (1,:) double = [];
         ForcingSignal           % timeseries object from SignalBuilder
+
+        % External-mode upload buffer (samples). At T=0.001 this is 0.25 s.
+        % Keep this much smaller than the run so Scopes/SDI update during
+        % the run. To Workspace still dumps the full record at stop.
+        LiveBufferSamples (1,1) double = 250;
     end
 
     events 
@@ -72,6 +77,56 @@ classdef AppModel < handle
             set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
 
             drawnow;
+        end
+
+        function prepareLiveStreaming(obj)
+            % SLDRT Run in Kernel does not write To Workspace until stop.
+            % Live traces come from external-mode buffers (sldrtext) into
+            % Scope / Simulation Data Inspector. Duration is the buffer
+            % length; Mode normal rearms so buffers keep uploading.
+            % Changing these does not require a rebuild.
+            modelName = char(obj.SimulationModelName);
+            if ~bdIsLoaded(modelName)
+                load_system(modelName);
+            end
+
+            set_param(modelName, 'ExtModeArmWhenConnect', 'on');
+            set_param(modelName, 'ExtModeTrigMode', 'normal');
+            set_param(modelName, 'ExtModeTrigDuration', ...
+                num2str(obj.LiveBufferSamples));
+
+            daqBlk = find_system(modelName, 'SearchDepth', 1, ...
+                'Regexp', 'on', 'Name', '^EMB');
+            if ~isempty(daqBlk)
+                if iscell(daqBlk)
+                    daqBlk = daqBlk{1};
+                end
+                Simulink.sdi.markSignalForStreaming(daqBlk, 3, 'on');
+            end
+        end
+
+        function [t, y] = getLiveCart1Position(obj)
+            % Latest Cart 1 position streamed to SDI. Empty until the first
+            % external-mode buffer has been uploaded.
+            t = [];
+            y = [];
+            try
+                runObj = Simulink.sdi.getCurrentSimulationRun( ...
+                    char(obj.SimulationModelName));
+                if isempty(runObj)
+                    return;
+                end
+
+                sigs = runObj.getAllSignals();
+                for i = 1:numel(sigs)
+                    name = char(sigs(i).Name);
+                    if contains(name, 'Cart1-Position', 'IgnoreCase', true)
+                        [t, y] = AppModel.signalValuesToXY(sigs(i).Values);
+                        return;
+                    end
+                end
+            catch
+            end
         end
 
         function connectTarget(obj)
@@ -149,12 +204,32 @@ classdef AppModel < handle
     end
 
     methods (Access = private)
-        function rebuildTarget(obj, modelName)
+        function rebuildTarget(~, modelName)
             try
                 slbuild(modelName);
             catch
                 rtwbuild(modelName);
             end
+        end
+    end
+
+    methods (Static, Access = private)
+        function [t, y] = signalValuesToXY(vals)
+            t = [];
+            y = [];
+            if isa(vals, 'timeseries')
+                t = vals.Time(:);
+                y = squeeze(vals.Data);
+                y = y(:);
+            elseif istimetable(vals)
+                t = seconds(vals.Time);
+                t = t(:);
+                y = vals{:, 1};
+                y = y(:);
+            end
+            n = min(numel(t), numel(y));
+            t = t(1:n);
+            y = y(1:n);
         end
     end
 end

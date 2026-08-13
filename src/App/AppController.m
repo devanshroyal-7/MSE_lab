@@ -46,6 +46,7 @@ classdef AppController < handle
                 drawnow;
 
                 t0 = tic;
+                obj.Model.prepareLiveStreaming();
                 obj.Model.connectTarget();
 
                 while strcmp(obj.Model.getSimulationStatus(), 'stopped') && toc(t0) < timeout_s
@@ -60,8 +61,10 @@ classdef AppController < handle
                     errordlg("Model failed to enter real-time execution", "Target Error");
                 else
                     obj.Model.startSimulation();
+                    obj.View.updateResponsePlot([], []);
 
                     while obj.Model.isSimulationRunning() && toc(t0) < timeout_s
+                        obj.plotLiveResponse();
                         pause(0.1);
                         drawnow;
                     end
@@ -113,6 +116,14 @@ classdef AppController < handle
     end
 
     methods (Access = private)
+        function plotLiveResponse(obj)
+            [t, y] = obj.Model.getLiveCart1Position();
+            if isempty(t) || isempty(y)
+                return;
+            end
+            obj.View.updateResponsePlot(t, y);
+        end
+
         function plotLoggedResponse(obj)
             if ~evalin('base', "exist('rt_time', 'var')") || ...
                     ~evalin('base', "exist('cart1_position', 'var')")
