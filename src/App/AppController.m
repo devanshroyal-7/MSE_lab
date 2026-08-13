@@ -46,7 +46,6 @@ classdef AppController < handle
                 drawnow;
 
                 t0 = tic;
-                obj.Model.prepareLiveStreaming();
                 obj.Model.connectTarget();
 
                 while strcmp(obj.Model.getSimulationStatus(), 'stopped') && toc(t0) < timeout_s
@@ -125,13 +124,29 @@ classdef AppController < handle
         end
 
         function plotLoggedResponse(obj)
-            if ~evalin('base', "exist('rt_time', 'var')") || ...
-                    ~evalin('base', "exist('cart1_position', 'var')")
-                return;
+            [tLive, yLive] = obj.Model.getLiveCart1Position();
+
+            tWs = [];
+            yWs = [];
+            if evalin('base', "exist('rt_time', 'var')") && ...
+                    evalin('base', "exist('cart1_position', 'var')")
+                tWs = squeeze(evalin('base', 'rt_time'));
+                yWs = squeeze(evalin('base', 'cart1_position'));
+                tWs = tWs(:);
+                yWs = yWs(:);
             end
 
-            t = squeeze(evalin('base', 'rt_time'));
-            y = squeeze(evalin('base', 'cart1_position'));
+            if numel(tLive) >= numel(tWs)
+                t = tLive;
+                y = yLive;
+            else
+                t = tWs;
+                y = yWs;
+            end
+
+            if isempty(t) || isempty(y)
+                return;
+            end
             obj.View.updateResponsePlot(t, y);
         end
     end

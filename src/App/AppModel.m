@@ -80,20 +80,23 @@ classdef AppModel < handle
         end
 
         function prepareLiveStreaming(obj)
-            % SLDRT Run in Kernel does not write To Workspace until stop.
-            % Live traces come from external-mode buffers (sldrtext) into
-            % Scope / Simulation Data Inspector. Duration is the buffer
-            % length; Mode normal rearms so buffers keep uploading.
-            % Changing these does not require a rebuild.
+            % SLDRT Run in Kernel uploads Duration-sized buffers. By default
+            % only the last buffer is written to the workspace, which is why
+            % the response plot showed a blip at t=end. Write every buffer,
+            % rearm, and apply this AFTER slbuild so the .slx Duration (20480)
+            % does not win.
             modelName = char(obj.SimulationModelName);
             if ~bdIsLoaded(modelName)
                 load_system(modelName);
             end
 
             set_param(modelName, 'ExtModeArmWhenConnect', 'on');
+            set_param(modelName, 'ExtModeTrigType', 'manual');
             set_param(modelName, 'ExtModeTrigMode', 'normal');
             set_param(modelName, 'ExtModeTrigDuration', ...
                 num2str(obj.LiveBufferSamples));
+            set_param(modelName, 'ExtModeLogAll', 'on');
+            set_param(modelName, 'ExtModeWriteAllDataToWs', 'on');
 
             daqBlk = find_system(modelName, 'SearchDepth', 1, ...
                 'Regexp', 'on', 'Name', '^EMB');
@@ -106,27 +109,9 @@ classdef AppModel < handle
         end
 
         function [t, y] = getLiveCart1Position(obj)
-            % Latest Cart 1 position streamed to SDI. Empty until the first
-            % external-mode buffer has been uploaded.
-            t = [];
-            y = [];
-            try
-                runObj = Simulink.sdi.getCurrentSimulationRun( ...
-                    char(obj.SimulationModelName));
-                if isempty(runObj)
-                    return;
-                end
-
-                sigs = runObj.getAllSignals();
-                for i = 1:numel(sigs)
-                    name = char(sigs(i).Name);
-                    if contains(name, 'Cart1-Position', 'IgnoreCase', true)
-                        [t, y] = AppModel.signalValuesToXY(sigs(i).Values);
-                        return;
-                    end
-                end
-            catch
-            end
+            obj.captureLiveCart1Chunk();
+            t = obj.TimeBuffer(:);
+            y = obj.PositionBuffer(:);
         end
 
         function connectTarget(obj)
@@ -145,23 +130,25 @@ classdef AppModel < handle
 
             try
                 slbuild(modelName);
-                % set_param(modelName, 'SimulationCommand', 'connect');
             catch
                 rtwbuild(modelName);
-                % obj.rebuildTarget(modelName);
-                % set_param(modelName, 'SimulationCommand', 'connect');
             end
 
+            obj.prepareLiveStreaming();
             set_param(modelName, 'SimulationCommand', 'connect');
         end
 
         function startSimulation(obj)
-            % clear up buffer
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
 
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
+            try
+                set_param(char(obj.SimulationModelName), ...
+                    'ExtModeCommand', 'armWired');
+            catch
+            end
         end
 
         function stopSimulation(obj)
@@ -211,6 +198,79 @@ classdef AppModel < handle
                 rtwbuild(modelName);
             end
         end
+
+        function captureLiveCart1Chunk(obj)
+            [t, y] = obj.readWorkspaceCart1();
+            if isempty(t)
+                [t, y] = obj.readSdiCart1();
+            end
+            obj.appendLiveChunk(t, y);
+        end
+
+        function [t, y] = readWorkspaceCart1(obj)
+            t = [];
+            y = [];
+            try
+                if ~evalin('base', "exist('cart1_position', 'var')")
+                    return;
+                end
+                raw = evalin('base', 'cart1_position');
+                [t, y] = AppModel.signalValuesToXY(raw);
+                if isempty(t) && evalin('base', "exist('rt_time', 'var')")
+                    t = squeeze(evalin('base', 'rt_time'));
+                    t = t(:);
+                    y = y(:);
+                    n = min(numel(t), numel(y));
+                    t = t(1:n);
+                    y = y(1:n);
+                end
+            catch
+            end
+        end
+
+        function [t, y] = readSdiCart1(obj)
+            t = [];
+            y = [];
+            try
+                runObj = Simulink.sdi.getCurrentSimulationRun( ...
+                    char(obj.SimulationModelName));
+                if isempty(runObj)
+                    return;
+                end
+                sigs = runObj.getAllSignals();
+                for i = 1:numel(sigs)
+                    name = char(sigs(i).Name);
+                    if contains(name, 'Cart1-Position', 'IgnoreCase', true)
+                        [t, y] = AppModel.signalValuesToXY(sigs(i).Values);
+                        return;
+                    end
+                end
+            catch
+            end
+        end
+
+        function appendLiveChunk(obj, t, y)
+            if isempty(t) || isempty(y)
+                return;
+            end
+            t = t(:)';
+            y = y(:)';
+            n = min(numel(t), numel(y));
+            t = t(1:n);
+            y = y(1:n);
+
+            if isempty(obj.TimeBuffer)
+                obj.TimeBuffer = t;
+                obj.PositionBuffer = y;
+                return;
+            end
+
+            mask = t > obj.TimeBuffer(end) + (obj.T / 2);
+            if any(mask)
+                obj.TimeBuffer = [obj.TimeBuffer, t(mask)];
+                obj.PositionBuffer = [obj.PositionBuffer, y(mask)];
+            end
+        end
     end
 
     methods (Static, Access = private)
@@ -226,10 +286,19 @@ classdef AppModel < handle
                 t = t(:);
                 y = vals{:, 1};
                 y = y(:);
+            elseif isstruct(vals) && isfield(vals, 'time') && isfield(vals, 'signals')
+                t = vals.time(:);
+                y = squeeze(vals.signals(1).values);
+                y = y(:);
+            elseif isnumeric(vals)
+                y = squeeze(vals);
+                y = y(:);
             end
-            n = min(numel(t), numel(y));
-            t = t(1:n);
-            y = y(1:n);
+            if ~isempty(t) && ~isempty(y)
+                n = min(numel(t), numel(y));
+                t = t(1:n);
+                y = y(1:n);
+            end
         end
     end
 end
