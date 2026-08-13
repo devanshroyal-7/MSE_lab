@@ -29,9 +29,12 @@ function tsData = SignalBuilderApp()
 
     if isvalid(controller) && controller.IsFinished
 
-        [t, y] = model.compileCompositeSignal();
+        [t, y] = model.compileFinalSignal();
 
         tsData = timeseries(y, t);
+        tsData.UserData = struct( ...
+            "CycleDuration", model.CycleDuration, ...
+            "NumCycles", model.NumCycles);
     end
 
     delete(controller)
