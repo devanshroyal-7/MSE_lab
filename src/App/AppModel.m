@@ -89,15 +89,15 @@ classdef AppModel < handle
             set_param(modelName, 'SimulationMode', 'external');
 
             try
-                % slbuild(modelName);
-                set_param(modelName, 'SimulationCommand', 'connect');
+                slbuild(modelName);
+                % set_param(modelName, 'SimulationCommand', 'connect');
             catch
-                % rtwbuild(modelName);
-                obj.rebuildTarget(modelName);
-                set_param(modelName, 'SimulationCommand', 'connect');
+                rtwbuild(modelName);
+                % obj.rebuildTarget(modelName);
+                % set_param(modelName, 'SimulationCommand', 'connect');
             end
 
-            % set_param(modelName, 'SimulationCommand', 'connect');
+            set_param(modelName, 'SimulationCommand', 'connect');
         end
 
         function startSimulation(obj)
