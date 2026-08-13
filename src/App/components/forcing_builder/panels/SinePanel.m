@@ -1,4 +1,16 @@
 classdef SinePanel < handle
+    % Function-setup UI for SineSignal (amplitude, Hz, phase, duration).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = SinePanel(fig);
+    >> sig = panel.createSignal;          % SineSignal from current fields
+    >> panel.populate(SineSignal(2, 5, 0, 10));
+
+    %}
+
     properties
         MainLayoutGrid
         AmpEditField

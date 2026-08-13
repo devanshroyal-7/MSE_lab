@@ -1,4 +1,17 @@
 classdef TimePanel < handle
+    % Time-domain tab: measured response axes above, reference/forcing axes below.
+    % OverlayCheckBox is meant to draw the reference on the response plot.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 800, 700]);
+    >> panel = TimePanel(fig);
+    >> plot(panel.ResponsePlot, t, x);
+    >> plot(panel.ReferencePlot, t, f);
+
+    %}
+
     properties
         MainLayoutGrid
         ResponseLabel
@@ -6,7 +19,7 @@ classdef TimePanel < handle
         ReferenceLabel
         ReferencePlot
         OverlayCheckBox
-        SignalButton
+        SignalButton          % reserved; not created in the constructor yet
     end
     methods
         function obj = TimePanel(parentContainer)

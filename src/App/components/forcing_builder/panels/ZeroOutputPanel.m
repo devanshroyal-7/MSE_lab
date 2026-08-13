@@ -1,4 +1,16 @@
 classdef ZeroOutputPanel < handle
+    % Function-setup UI for ZeroOutputSignal (duration only).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = ZeroOutputPanel(fig);
+    >> sig = panel.createSignal;
+    >> panel.populate(ZeroOutputSignal(10));
+
+    %}
+
     properties
         MainLayoutGrid
         DurationEditField
