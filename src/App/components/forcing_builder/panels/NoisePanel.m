@@ -1,4 +1,16 @@
 classdef NoisePanel < handle
+    % Function-setup UI for NoiseSignal (amplitude, band, duration, seed).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = NoisePanel(fig);
+    >> sig = panel.createSignal;
+    >> panel.populate(NoiseSignal(1, 1, 10, 10, 42));
+
+    %}
+
     properties
         MainLayoutGrid
         AmpEditField

@@ -1,5 +1,15 @@
 classdef StepSignal < BaseSignal
-    % Subclass for Step Signal
+    % Step force: 0 for OffTime seconds, then Magnitude until TotalDuration.
+    % TotalDuration = OffTime + OnTime.
+    %
+    %{
+    Example usage:
+
+    >> sig = StepSignal(2, 5, 1);     % magnitude [N], on time [s], off time [s]
+    >> t = 0:0.001:sig.TotalDuration;
+    >> plot(t, sig.evaluate(t));
+
+    %}
 
     properties
         Name = "Step"

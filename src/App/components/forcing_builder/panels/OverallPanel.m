@@ -1,4 +1,19 @@
 classdef OverallPanel < handle
+    % Left column of the forcing builder: Available types vs Overall stack,
+    % Add/Remove/Clear, and Single/Overall plot switch.
+    % OverallMode is 'available' while previewing a type, 'overall' while
+    % editing a signal already on the stack.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = OverallPanel(fig);
+    >> panel.AvailableListBox.Value     % e.g. "Sine"
+    >> panel.AddCallback = @(name) disp(name);   % controller assigns these
+
+    %}
+
     properties
         MainLayoutGrid
         AvailableLabel
@@ -108,7 +123,7 @@ classdef OverallPanel < handle
 
             obj.ViewSwitch.Value = 'Single';
 
-            obj.ViewSwitch.Enable = 'off';
+            obj.ViewSwitch.Enable = 'off';   % Single/Overall only applies to the stack
             
             if ~isempty(obj.SelectAvailableCallback)
                 selectedSignal = string(event.Value);
@@ -126,7 +141,7 @@ classdef OverallPanel < handle
             if ~isempty(obj.SelectOverallCallback)
                 selectedSignal = event.ValueIndex;
 
-                % don't destroy panel if same signal is being used
+                % Rebuild the setup panel only when the selected type changes.
                 if strcmp(event.Value, event.PreviousValue)
                     swapFlag = false;
                 else

@@ -1,4 +1,18 @@
 classdef TimePanel < handle
+    % Time-domain tab: measured response axes above, reference/forcing axes below.
+    % OverlayCheckBox is meant to draw the reference on the response plot.
+    % updateReferencePlot / updateResponsePlot write cached line handles.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 800, 700]);
+    >> panel = TimePanel(fig);
+    >> panel.updateReferencePlot(t, f);
+    >> panel.updateResponsePlot(t, x);
+
+    %}
+
     properties
         MainLayoutGrid
         ResponseLabel
@@ -6,7 +20,11 @@ classdef TimePanel < handle
         ReferenceLabel
         ReferencePlot
         OverlayCheckBox
-        SignalButton
+        SignalButton          % reserved; not created in the constructor yet
+
+        % Cached line handles so streaming can set XData/YData without new plot()
+        RefLineHandle
+        RespLineHandle
     end
     methods
         function obj = TimePanel(parentContainer)
@@ -53,6 +71,33 @@ classdef TimePanel < handle
             obj.ReferencePlot = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
             obj.ReferencePlot.Layout.Column = [1 2];
             obj.ReferencePlot.Layout.Row = 5; 
+
+            % Handle to manipulate plots
+            obj.RefLineHandle = plot(obj.ReferencePlot, NaN, NaN, 'b-', LineWidth=1.5);
+            xlabel(obj.ReferencePlot, 'Time (s)');
+            ylabel(obj.ReferencePlot, 'Displacement (m)');
+
+            obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
+            xlabel(obj.ResponsePlot, 'Time (s)');
+            ylabel(obj.ResponsePlot, 'Displacement (m)');
+        end
+
+        function updateReferencePlot(obj, t, y)
+            if isempty(t) || isempty(y)
+                set(obj.RefLineHandle, 'XData', NaN, 'YData', NaN);
+                return;
+            end
+            set(obj.RefLineHandle, 'XData', t, 'YData', y);
+            xlim(obj.ReferencePlot, [0, max(0.1, t(end))]);
+        end
+
+        function updateResponsePlot(obj, t, y)
+            if isempty(t) || isempty(y)
+                set(obj.RespLineHandle, 'XData', NaN, 'YData', NaN);
+                return;
+            end
+            set(obj.RespLineHandle, 'XData', t, 'YData', y);
+            xlim(obj.ResponsePlot, [0, max(0.1, t(end))]);
         end
     end
 end

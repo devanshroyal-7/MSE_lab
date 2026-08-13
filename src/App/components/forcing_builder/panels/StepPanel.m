@@ -1,4 +1,16 @@
 classdef StepPanel < handle
+    % Function-setup UI for StepSignal (magnitude, on time, off time).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure;
+    >> panel = StepPanel(fig);
+    >> sig = panel.createSignal;
+    >> panel.populate(StepSignal(2, 5, 1));
+
+    %}
+
     properties
         MainLayoutGrid
         MagEditField

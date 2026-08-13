@@ -1,4 +1,18 @@
-classdef SidebarPanel < handle 
+classdef SidebarPanel < handle
+    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, PID gains,
+    % Create Forcing Function, and Save Outputs. Start and Create Forcing
+    % Function forward to AppView; enable toggles only change their own color.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [100, 100, 320, 640]);
+    >> panel = SidebarPanel(fig);
+    >> panel.KSimEditField.Value = 200;
+    >> panel.fwdRunSignalCallback = @() disp("start");
+
+    %}
+
     properties
         MainLayoutGrid
         
@@ -13,13 +27,22 @@ classdef SidebarPanel < handle
         KiEditField
         KdEditField
         EnableControlsButton
+
+        CreateFcnButton
+        SaveOutputButton
+
+        % Fwd Callbacks
+        fwdRunSignalCallback
+
+        fwdSignalBuilderCallback
+        fwdSaveOutputCallback
     end
 
     methods
         function obj = SidebarPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [12, 4]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [14, 4]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x', '1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30};
+            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
 
             %%% Real-time Simulation Controls %%%
             SimControlLabel = uilabel(obj.MainLayoutGrid, ...
@@ -140,10 +163,20 @@ classdef SidebarPanel < handle
                 "ValueChangedFcn", @(src, event) obj.enableControlCallback(event));
             obj.EnableControlsButton.Layout.Column = 2;
             obj.EnableControlsButton.Layout.Row = 4;
-        end
 
-        function runSimCallback(obj)
-            
+            %%% Forcing Function Button %%%
+            obj.CreateFcnButton = uibutton(obj.MainLayoutGrid, ...
+                "Text","Create Forcing Function", ...
+                "ButtonPushedFcn", @(src, event) obj.createFcnCallback());
+            obj.CreateFcnButton.Layout.Column = [1, 2];
+            obj.CreateFcnButton.Layout.Row = 14;
+
+            %%% Save Output Button %%%
+            obj.SaveOutputButton = uibutton(obj.MainLayoutGrid, ...
+                "Text","Save Outputs", ...
+                "ButtonPushedFcn", @(src, event) obj.saveOutputCallback());
+            obj.SaveOutputButton.Layout.Column = [3, 4];
+            obj.SaveOutputButton.Layout.Row = 14;
         end
 
         function enableSimParamCallback(obj, event)
@@ -165,6 +198,24 @@ classdef SidebarPanel < handle
             else
                 obj.EnableControlsButton.Text = "DISABLED";
                 obj.EnableControlsButton.BackgroundColor = "red";
+            end
+        end
+        
+        function runSimCallback(obj)
+            if ~isempty(obj.fwdRunSignalCallback)
+                obj.fwdRunSignalCallback();
+            end
+        end
+
+        function createFcnCallback(obj)
+            if ~isempty(obj.fwdSignalBuilderCallback)
+                obj.fwdSignalBuilderCallback();
+            end
+        end
+
+        function saveOutputCallback(obj)
+            if ~isempty(obj.fwdSaveOutputCallback)
+                obj.fwdSaveOutputCallback();
             end
         end
     end

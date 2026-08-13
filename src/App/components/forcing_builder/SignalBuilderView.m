@@ -1,5 +1,18 @@
 classdef SignalBuilderView < handle
-    % Use grid size 940 x 630
+    % Forcing-builder UI: plot, Available/Overall lists, setup panel, extras.
+    % Use parent figure size 940 x 630. Callbacks are function handles the
+    % controller assigns; this class only forwards them.
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [500, 500, 940, 630]);
+    >> view = SignalBuilderView(fig);
+    >> view.swapActivePanel("Sine");
+    >> sig = view.getActiveSignal;    % SineSignal from the current field values
+    >> view.updatePlot(0:0.001:1, sin(2*pi*(0:0.001:1)));
+
+    %}
 
     properties
         UIFigure
@@ -114,6 +127,7 @@ classdef SignalBuilderView < handle
         end
 
         function swapActivePanel(obj, panelName)
+            % Replace the Function Setup contents with the panel for panelName.
             panelName = string(panelName);
 
             if ~isempty(obj.ActiveSetupPanel) && isvalid(obj.ActiveSetupPanel)

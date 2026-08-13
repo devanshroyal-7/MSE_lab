@@ -1,24 +1,40 @@
 classdef AppView < handle
-    % use size [500, 500, 1100, 850]
+    % Main MSE app window: title, Time/Frequency/Controls tabs, sidebar.
+    % Recommended figure size: [500, 500, 1900, 900] (see main.m).
+    %
+    %{
+    Example usage:
+
+    >> fig = uifigure("Position", [500, 500, 1900, 900]);
+    >> view = AppView(fig);
+    >> view.updateReferencePlot(timeseries(y, t));
+    >> view.FreqDomainPanel.AxFRF          % FRF axes
+
+    %}
 
     properties 
+        UIFigure
         MainLayoutGrid
         SimStart
         TabGroup
         SaveButton
-        % TimeTab
         TimeDomainPanel
         FreqDomainPanel
+        Sidebar
 
         % Callback properties
-        fwdRunSimCallback
+        fwdRunSimCallbackView
+        fwdSignalBuilderCallbackView
+        fwdSaveOutputCallbackView
     end
 
     methods
         function obj = AppView(parentContainer)
+            obj.UIFigure = parentContainer;
             obj.MainLayoutGrid = uigridlayout(parentContainer, [10, 10]);
-            obj.MainLayoutGrid.Padding = [0, 10, 0, 10];
-            obj.MainLayoutGrid.RowHeight = {60, '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x', 30};
+            % obj.MainLayoutGrid.ColumnSpacing = 0;
+            obj.MainLayoutGrid.Padding = [0, 0, 10, 0];
+            obj.MainLayoutGrid.RowHeight = {60, '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x', '1x'};
             obj.MainLayoutGrid.ColumnWidth = {100, '1x', '1x', 100, 100, 100, '1x', '1x', 100, 100};
             
             % Title 
@@ -40,18 +56,8 @@ classdef AppView < handle
             % Tabs
             obj.TabGroup = uitabgroup(obj.MainLayoutGrid);
             obj.TabGroup.Layout.Column = [1, 7];
-            obj.TabGroup.Layout.Row = [2, 9];
+            obj.TabGroup.Layout.Row = [2, 10];
 
-            % Save Button
-            SaveButtonGrid = uigridlayout(obj.MainLayoutGrid, [1, 2]);
-            SaveButtonGrid.Layout.Column = [8, 10];
-            SaveButtonGrid.Layout.Row = 10;
-            SaveButtonGrid.Padding = [0, 0, 12, 0];
-            SaveButtonGrid.ColumnWidth = {'1x', 200};
-            obj.SaveButton = uibutton(SaveButtonGrid, "Text", "Save Output");
-            obj.SaveButton.Layout.Column = 2;
-            obj.SaveButton.Layout.Row = 1;
-            
             % Time Domain
             TimeTab = uitab(obj.TabGroup, "Title", "Time");
             obj.TimeDomainPanel = TimePanel(TimeTab);
@@ -60,19 +66,44 @@ classdef AppView < handle
             FrequencyTab = uitab(obj.TabGroup, "Title", "Freuqency");
             obj.FreqDomainPanel = FrequencyPanel(FrequencyTab);
 
-            % Controls
+            % Controls tab is a placeholder; live sim controls are on SidebarPanel
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
             
             SidePanel = uipanel(obj.MainLayoutGrid);
+            SidePanel.BorderType = 'none';
             SidePanel.Layout.Column = [8, 10];
-            SidePanel.Layout.Row = [2, 9];
+            SidePanel.Layout.Row = [2, 10];
 
-            Sidebar = SidebarPanel(SidePanel);
+            obj.Sidebar = SidebarPanel(SidePanel);
+            obj.Sidebar.fwdRunSignalCallback = @() obj.handleRunSimCallback();
+            obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
+            obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
+        end
+    
+        function updateReferencePlot(obj, sim_input)
+            t = sim_input.Time;
+            y = squeeze(sim_input.Data);
+            obj.TimeDomainPanel.updateReferencePlot(t, y);
+        end
+    end
+
+    methods
+        % Callback methods
+        function handleRunSimCallback(obj)
+            if ~isempty(obj.fwdRunSimCallbackView)
+                obj.fwdRunSimCallbackView();
+            end
         end
 
-        function RunSimCallback(obj)
-            if ~isempty(obj.fwdRunSimCallback)
-                obj.fwdRunSimCallback();
+        function handleSignalBuilderCallback(obj)
+            if ~isempty(obj.fwdSignalBuilderCallbackView)
+                obj.fwdSignalBuilderCallbackView();
+            end
+        end
+
+        function handleSaveOutputCallback(obj)
+            if ~isempty(obj.fwdSaveOutputCallbackView())
+                obj.fwdSaveOutputCallbackView();
             end
         end
     end

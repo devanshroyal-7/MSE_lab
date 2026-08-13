@@ -73,6 +73,8 @@ classdef SignalBuilderModel < handle
         end
 
         function [t, y] = compileCompositeSignal(obj)
+            % Superposition: every signal is evaluated on the same t axis
+            % starting at 0 (not concatenated). TotalDuration is the max.
             dt = 1/obj.SampleRate;
             t = 0:dt:obj.TotalDuration;
 
@@ -83,14 +85,14 @@ classdef SignalBuilderModel < handle
         end
 
         function [t, y] = evaluateIndividualSignal(obj, idx)
+            % Preview one stacked signal on its own duration (Single plot mode).
             dt = 1/obj.SampleRate;
             t = 0:dt:obj.Signals{idx}.TotalDuration;
             y = obj.Signals{idx}.evaluate(t);
         end
 
         function [t, y] = evaluateSignal(obj, SigObject)
-            % this method is for signals that are not part of the model
-            % e.g. temp signals for the available select
+            % Preview a signal that is not in obj.Signals yet (Available list).
             dt = 1/obj.SampleRate;
             
             if isempty(SigObject)
