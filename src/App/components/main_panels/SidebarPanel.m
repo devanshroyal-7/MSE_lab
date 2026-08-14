@@ -6,8 +6,7 @@ classdef SidebarPanel < handle
     %{
     Example usage:
 
-    >> fig = uifigure("Position", [100, 100, 320, 640]);
-    >> panel = SidebarPanel(fig);
+    >> fig = uifigure("Position", [100, 100, 320, 640]); panel = SidebarPanel(fig);
     >> panel.KSimEditField.Value = 200;
     >> panel.fwdRunSignalCallback = @() disp("start");
 
@@ -53,9 +52,18 @@ classdef SidebarPanel < handle
             SimControlLabel.Layout.Column = [1, 2];
             SimControlLabel.Layout.Row = 1;
 
-            obj.SimLamp = uilamp(obj.MainLayoutGrid, "Color", [0 1 0]);
-            obj.SimLamp.Layout.Column = [3, 4];
-            obj.SimLamp.Layout.Row = 1;
+            padSimLamp = uigridlayout(obj.MainLayoutGrid, [1, 4]);
+            padSimLamp.Padding = [0, 0, 0, 0];
+            padSimLamp.Layout.Row = 1;
+            padSimLamp.Layout.Column = [3, 4];
+            
+            simLable = uilabel(padSimLamp, ...
+                "Text", "Simulation Status", ...
+                "HorizontalAlignment", 'right');
+            simLable.Layout.Column = [1, 3];
+
+            obj.SimLamp = uilamp(padSimLamp, "Color", [0 1 0]);
+            obj.SimLamp.Layout.Column = 4;
 
             % Start Simulation
             obj.SimStartButton = uibutton(obj.MainLayoutGrid, ...
