@@ -37,6 +37,7 @@ classdef AppController < handle
 
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
+            obj.View.updateResponsePlot([], []);
 
             try
                 d = uiprogressdlg(figHandle, ...
@@ -45,11 +46,11 @@ classdef AppController < handle
                     "Indeterminate", "on");
                 drawnow;
 
-                t0 = tic;
+                tConnect = tic;
                 obj.Model.connectTarget();
 
-                while strcmp(obj.Model.getSimulationStatus(), 'stopped') && toc(t0) < timeout_s
-                    pause(0.1);
+                while strcmp(obj.Model.getSimulationStatus(), 'stopped') && toc(tConnect) < timeout_s
+                    pause(0.05);
                     drawnow;
                 end
 
@@ -62,9 +63,12 @@ classdef AppController < handle
                     obj.Model.startSimulation();
                     obj.View.updateResponsePlot([], []);
 
-                    while obj.Model.isSimulationRunning() && toc(t0) < timeout_s
+                    tRun = tic;
+                    runLimit = obj.Model.S + timeout_s;
+
+                    while obj.Model.isSimulationRunning() && toc(tRun) < runLimit
                         obj.plotLiveResponse();
-                        pause(0.1);
+                        pause(0.05);
                         drawnow;
                     end
 
@@ -124,26 +128,7 @@ classdef AppController < handle
         end
 
         function plotLoggedResponse(obj)
-            [tLive, yLive] = obj.Model.getLiveCart1Position();
-
-            tWs = [];
-            yWs = [];
-            if evalin('base', "exist('rt_time', 'var')") && ...
-                    evalin('base', "exist('cart1_position', 'var')")
-                tWs = squeeze(evalin('base', 'rt_time'));
-                yWs = squeeze(evalin('base', 'cart1_position'));
-                tWs = tWs(:);
-                yWs = yWs(:);
-            end
-
-            if numel(tLive) >= numel(tWs)
-                t = tLive;
-                y = yLive;
-            else
-                t = tWs;
-                y = yWs;
-            end
-
+            [t, y] = obj.Model.getLiveCart1Position();
             if isempty(t) || isempty(y)
                 return;
             end

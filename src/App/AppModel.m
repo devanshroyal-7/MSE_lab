@@ -33,7 +33,7 @@ classdef AppModel < handle
 
         % Simulation control and configuration
         SimulationModelName (1,1) string = "MSE_PLANT";
-        RunTimeout (1,1) double = 30;   % [s] hard cap so the UI cannot deadlock
+        RunTimeout (1,1) double = 30;   % [s] connect/start hang cap (not run length)
         
         S   (1,1) double {mustBeNumeric} = 10;  % simulation time   [s]
         TimeBuffer      (1,:) double = [];
@@ -41,10 +41,13 @@ classdef AppModel < handle
         VelocityBuffer  (1,:) double = [];
         ForcingSignal           % timeseries object from SignalBuilder
 
-        % External-mode upload buffer (samples). At T=0.001 this is 0.25 s.
-        % Keep this much smaller than the run so Scopes/SDI update during
-        % the run. To Workspace still dumps the full record at stop.
-        LiveBufferSamples (1,1) double = 250;
+        % External-mode upload buffer (samples). At T=0.001 this is 0.05 s.
+        LiveBufferSamples (1,1) double = 50;
+    end
+
+    properties (Access = private)
+        LiveArmed (1,1) logical = false
+        StaleSdiRunId = []
     end
 
     events 
@@ -142,6 +145,8 @@ classdef AppModel < handle
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
+            obj.LiveArmed = false;
+            obj.StaleSdiRunId = obj.currentSdiRunId();
 
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
             try
@@ -201,9 +206,8 @@ classdef AppModel < handle
 
         function captureLiveCart1Chunk(obj)
             [t, y] = obj.readWorkspaceCart1();
-            if isempty(t)
-                [t, y] = obj.readSdiCart1();
-            end
+            obj.appendLiveChunk(t, y);
+            [t, y] = obj.readSdiCart1();
             obj.appendLiveChunk(t, y);
         end
 
@@ -228,6 +232,18 @@ classdef AppModel < handle
             end
         end
 
+        function id = currentSdiRunId(obj)
+            id = [];
+            try
+                runObj = Simulink.sdi.getCurrentSimulationRun( ...
+                    char(obj.SimulationModelName));
+                if ~isempty(runObj)
+                    id = runObj.id;
+                end
+            catch
+            end
+        end
+
         function [t, y] = readSdiCart1(obj)
             t = [];
             y = [];
@@ -235,6 +251,9 @@ classdef AppModel < handle
                 runObj = Simulink.sdi.getCurrentSimulationRun( ...
                     char(obj.SimulationModelName));
                 if isempty(runObj)
+                    return;
+                end
+                if ~isempty(obj.StaleSdiRunId) && isequal(runObj.id, obj.StaleSdiRunId)
                     return;
                 end
                 sigs = runObj.getAllSignals();
@@ -259,9 +278,17 @@ classdef AppModel < handle
             t = t(1:n);
             y = y(1:n);
 
-            if isempty(obj.TimeBuffer)
-                obj.TimeBuffer = t;
-                obj.PositionBuffer = y;
+            % Workspace/SDI still hold the previous run's last buffer, whose
+            % timestamps are near the old StopTime. If we accept that as the
+            % start of this run, new samples at t≈0 are dropped until they
+            % catch up. Wait for a buffer that starts near t=0.
+            if ~obj.LiveArmed
+                maxStart = max(1.0, 4 * obj.LiveBufferSamples * obj.T);
+                if t(1) <= maxStart
+                    obj.LiveArmed = true;
+                    obj.TimeBuffer = t;
+                    obj.PositionBuffer = y;
+                end
                 return;
             end
 
