@@ -6,8 +6,7 @@ classdef TimePanel < handle
     %{
     Example usage:
 
-    >> fig = uifigure("Position", [100, 100, 800, 700]);
-    >> panel = TimePanel(fig);
+    >> fig = uifigure("Position", [100, 100, 800, 700]); panel = TimePanel(fig);
     >> panel.updateReferencePlot(t, f);
     >> panel.updateResponsePlot(t, x);
 
@@ -50,20 +49,20 @@ classdef TimePanel < handle
             obj.ResponsePlot.Layout.Column = [1 2];
             obj.ResponsePlot.Layout.Row = 2;
             
-            padCheckbox = uigridlayout(obj.MainLayoutGrid, [1, 2]);
+            padCheckbox = uigridlayout(obj.MainLayoutGrid, [1, 4]);
             padCheckbox.Padding = [0, 0, 0, 10];
             padCheckbox.Layout.Column = [1 2];
             padCheckbox.Layout.Row = 3;
-            padCheckbox.ColumnWidth = {'1x', 140};
+            padCheckbox.ColumnWidth = {'1x', '1x', 150, 140};
 
             obj.AutoscaleCheckBox = uicheckbox(padCheckbox, ...
                 "Text", "Lock X-axis to Duration", ...
                 "Value", true, ...
                 "ValueChangedFcn", @(~,~) obj.applyResponseXLim());
-            obj.AutoscaleCheckBox.Layout.Column = 1;
+            obj.AutoscaleCheckBox.Layout.Column = 3;
 
             obj.OverlayCheckBox = uicheckbox(padCheckbox, "Text", "Overlay Reference", "Value", false);
-            obj.OverlayCheckBox.Layout.Column = 2;
+            obj.OverlayCheckBox.Layout.Column = 4;
 
             % Reference Section (Bottom)
             obj.ReferenceLabel = uilabel(obj.MainLayoutGrid, ...
