@@ -20,11 +20,13 @@ classdef TimePanel < handle
         ReferenceLabel
         ReferencePlot
         OverlayCheckBox
+        AutoscaleCheckBox
         SignalButton          % reserved; not created in the constructor yet
 
         % Cached line handles so streaming can set XData/YData without new plot()
         RefLineHandle
         RespLineHandle
+        SimDuration (1,1) double = 0.1
     end
     methods
         function obj = TimePanel(parentContainer)
@@ -48,17 +50,21 @@ classdef TimePanel < handle
             obj.ResponsePlot.Layout.Column = [1 2];
             obj.ResponsePlot.Layout.Row = 2;
             
-            % Controls Section (Middle - Overlay Checkbox)
             padCheckbox = uigridlayout(obj.MainLayoutGrid, [1, 2]);
-            % [left, bottom, right, top] padding. 10px top padding separates it from the plot
-            padCheckbox.Padding = [0, 0, 0, 10]; 
-            padCheckbox.Layout.Column = 2; % Place in the right column of main grid
-            padCheckbox.Layout.Row = 3; 
-            padCheckbox.ColumnWidth = {'1x', 140}; % Push checkbox to the right edge
-            
+            padCheckbox.Padding = [0, 0, 0, 10];
+            padCheckbox.Layout.Column = [1 2];
+            padCheckbox.Layout.Row = 3;
+            padCheckbox.ColumnWidth = {'1x', 140};
+
+            obj.AutoscaleCheckBox = uicheckbox(padCheckbox, ...
+                "Text", "Lock X-axis to Duration", ...
+                "Value", true, ...
+                "ValueChangedFcn", @(~,~) obj.applyResponseXLim());
+            obj.AutoscaleCheckBox.Layout.Column = 1;
+
             obj.OverlayCheckBox = uicheckbox(padCheckbox, "Text", "Overlay Reference", "Value", false);
             obj.OverlayCheckBox.Layout.Column = 2;
-            
+
             % Reference Section (Bottom)
             obj.ReferenceLabel = uilabel(obj.MainLayoutGrid, ...
                 "Text", "Reference Plot", ...
@@ -88,16 +94,38 @@ classdef TimePanel < handle
                 return;
             end
             set(obj.RefLineHandle, 'XData', t, 'YData', y);
-            xlim(obj.ReferencePlot, [0, max(0.1, t(end))]);
+            obj.SimDuration = max(0.1, t(end));
+            xlim(obj.ReferencePlot, [0, obj.SimDuration]);
+            obj.applyResponseXLim();
         end
 
         function updateResponsePlot(obj, t, y)
             if isempty(t) || isempty(y)
                 set(obj.RespLineHandle, 'XData', NaN, 'YData', NaN);
+                obj.applyResponseXLim();
                 return;
             end
             set(obj.RespLineHandle, 'XData', t, 'YData', y);
-            xlim(obj.ResponsePlot, [0, max(0.1, t(end))]);
+            obj.applyResponseXLim(t);
+        end
+    end
+
+    methods (Access = private)
+        function applyResponseXLim(obj, t)
+            if obj.AutoscaleCheckBox.Value
+                xlim(obj.ResponsePlot, [0, obj.SimDuration]);
+                return;
+            end
+
+            if nargin < 2 || isempty(t)
+                t = obj.RespLineHandle.XData;
+            end
+            if isempty(t) || all(isnan(t))
+                xEnd = obj.SimDuration;
+            else
+                xEnd = max(0.1, t(end));
+            end
+            xlim(obj.ResponsePlot, [0, xEnd]);
         end
     end
 end
