@@ -25,6 +25,7 @@ classdef TimePanel < handle
         % Cached line handles so streaming can set XData/YData without new plot()
         RefLineHandle
         RespLineHandle
+        OverlayLineHandle
         SimDuration (1,1) double = 0.1
     end
     methods
@@ -61,7 +62,10 @@ classdef TimePanel < handle
                 "ValueChangedFcn", @(~,~) obj.applyResponseXLim());
             obj.AutoscaleCheckBox.Layout.Column = 3;
 
-            obj.OverlayCheckBox = uicheckbox(padCheckbox, "Text", "Overlay Reference", "Value", false);
+            obj.OverlayCheckBox = uicheckbox(padCheckbox, ...
+                "Text", "Overlay Reference", ...
+                "Value", false, ...
+                "ValueChangedFcn", @(~,~) obj.applyOverlay());
             obj.OverlayCheckBox.Layout.Column = 4;
 
             % Reference Section (Bottom)
@@ -80,25 +84,36 @@ classdef TimePanel < handle
             % Handle to manipulate plots
             obj.RefLineHandle = plot(obj.ReferencePlot, NaN, NaN, 'b-', LineWidth=1.5);
             xlabel(obj.ReferencePlot, 'Time (s)');
-            ylabel(obj.ReferencePlot, 'Displacement (m)');
+            ylabel(obj.ReferencePlot, 'Force (N)');
 
+            yyaxis(obj.ResponsePlot, 'left');
             obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
             xlabel(obj.ResponsePlot, 'Time (s)');
             ylabel(obj.ResponsePlot, 'Displacement (m)');
+
+            yyaxis(obj.ResponsePlot, 'right');
+            obj.OverlayLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
+            ylabel(obj.ResponsePlot, 'Force (N)');
+            obj.OverlayLineHandle.Visible = 'off';
+            obj.ResponsePlot.YAxis(2).Visible = 'off';
+            yyaxis(obj.ResponsePlot, 'left');
         end
 
         function updateReferencePlot(obj, t, y)
             if isempty(t) || isempty(y)
                 set(obj.RefLineHandle, 'XData', NaN, 'YData', NaN);
+                obj.applyOverlay();
                 return;
             end
             set(obj.RefLineHandle, 'XData', t, 'YData', y);
             obj.SimDuration = max(0.1, t(end));
             xlim(obj.ReferencePlot, [0, obj.SimDuration]);
             obj.applyResponseXLim();
+            obj.applyOverlay();
         end
 
         function updateResponsePlot(obj, t, y)
+            yyaxis(obj.ResponsePlot, 'left');
             if isempty(t) || isempty(y)
                 set(obj.RespLineHandle, 'XData', NaN, 'YData', NaN);
                 obj.applyResponseXLim();
@@ -110,6 +125,20 @@ classdef TimePanel < handle
     end
 
     methods (Access = private)
+        function applyOverlay(obj)
+            yyaxis(obj.ResponsePlot, 'right');
+            if obj.OverlayCheckBox.Value
+                t = obj.RefLineHandle.XData;
+                y = obj.RefLineHandle.YData;
+                set(obj.OverlayLineHandle, 'XData', t, 'YData', y, 'Visible', 'on');
+                obj.ResponsePlot.YAxis(2).Visible = 'on';
+            else
+                set(obj.OverlayLineHandle, 'Visible', 'off');
+                obj.ResponsePlot.YAxis(2).Visible = 'off';
+            end
+            yyaxis(obj.ResponsePlot, 'left');
+            obj.applyResponseXLim();
+        end
         function applyResponseXLim(obj, t)
             if obj.AutoscaleCheckBox.Value
                 xlim(obj.ResponsePlot, [0, obj.SimDuration]);
