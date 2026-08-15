@@ -6,7 +6,12 @@ classdef TimePanel < handle
     %{
     Example usage:
 
+<<<<<<< HEAD
     >> fig = uifigure("Position", [100, 100, 800, 700]); panel = TimePanel(fig);
+=======
+    >> fig = uifigure("Position", [100, 100, 800, 700]);
+    >> panel = TimePanel(fig);
+>>>>>>> origin/main
     >> panel.updateReferencePlot(t, f);
     >> panel.updateResponsePlot(t, x);
 
@@ -19,14 +24,20 @@ classdef TimePanel < handle
         ReferenceLabel
         ReferencePlot
         OverlayCheckBox
+<<<<<<< HEAD
         AutoscaleCheckBox
+=======
+>>>>>>> origin/main
         SignalButton          % reserved; not created in the constructor yet
 
         % Cached line handles so streaming can set XData/YData without new plot()
         RefLineHandle
         RespLineHandle
+<<<<<<< HEAD
         OverlayLineHandle
         SimDuration (1,1) double = 0.1
+=======
+>>>>>>> origin/main
     end
     methods
         function obj = TimePanel(parentContainer)
@@ -84,6 +95,7 @@ classdef TimePanel < handle
             % Handle to manipulate plots
             obj.RefLineHandle = plot(obj.ReferencePlot, NaN, NaN, 'b-', LineWidth=1.5);
             xlabel(obj.ReferencePlot, 'Time (s)');
+<<<<<<< HEAD
             ylabel(obj.ReferencePlot, 'Force (N)');
 
             yyaxis(obj.ResponsePlot, 'left');
@@ -97,11 +109,19 @@ classdef TimePanel < handle
             obj.OverlayLineHandle.Visible = 'off';
             obj.ResponsePlot.YAxis(2).Visible = 'off';
             yyaxis(obj.ResponsePlot, 'left');
+=======
+            ylabel(obj.ReferencePlot, 'Displacement (m)');
+
+            obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
+            xlabel(obj.ResponsePlot, 'Time (s)');
+            ylabel(obj.ResponsePlot, 'Displacement (m)');
+>>>>>>> origin/main
         end
 
         function updateReferencePlot(obj, t, y)
             if isempty(t) || isempty(y)
                 set(obj.RefLineHandle, 'XData', NaN, 'YData', NaN);
+<<<<<<< HEAD
                 obj.applyOverlay();
                 return;
             end
@@ -154,6 +174,21 @@ classdef TimePanel < handle
                 xEnd = max(0.1, t(end));
             end
             xlim(obj.ResponsePlot, [0, xEnd]);
+=======
+                return;
+            end
+            set(obj.RefLineHandle, 'XData', t, 'YData', y);
+            xlim(obj.ReferencePlot, [0, max(0.1, t(end))]);
+        end
+
+        function updateResponsePlot(obj, t, y)
+            if isempty(t) || isempty(y)
+                set(obj.RespLineHandle, 'XData', NaN, 'YData', NaN);
+                return;
+            end
+            set(obj.RespLineHandle, 'XData', t, 'YData', y);
+            xlim(obj.ResponsePlot, [0, max(0.1, t(end))]);
+>>>>>>> origin/main
         end
     end
 end

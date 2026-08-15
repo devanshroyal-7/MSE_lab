@@ -166,6 +166,7 @@ classdef SignalBuilderController < handle
             obj.syncViewToModel();
         end
 
+<<<<<<< HEAD
         function handleFinishCallback(obj)
             obj.copyAdditionalPanelToModel();
 
@@ -192,6 +193,8 @@ classdef SignalBuilderController < handle
             end
 
             obj.IsFinished = true;
+=======
+>>>>>>> origin/main
             uiresume(obj.View.UIFigure);   % unblocks SignalBuilderApp's uiwait
         end
 
