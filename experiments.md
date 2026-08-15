@@ -337,22 +337,25 @@ Disturbance in L5-E2/E3 is a physical table shake, not a software control.
 
 # Not yet implemented
 
-What the MATLAB app still needs so the experiments above can be run. Forcing-function types for most labs already exist (Ramp with mirrored/two-sided, Step, Sine, Swept Sine, Noise math, Custom, Zero Output, superposition, Additional Panel offset/delay/dwell/repeat, ±3 N force limit). `k_sim` / `c_sim` fields and Start Simulation exist as UI. Save Outputs and Controls are stubs.
+What the MATLAB app still needs so the experiments above can be run. Forcing-function types for most labs already exist (Ramp with mirrored/two-sided, Step, Sine, Swept Sine, Noise math, Custom, Zero Output, superposition, Additional Panel offset/delay/dwell/repeat, ±3 N force limit). Start Simulation, IDLE/running lamp, live Cart 1 on the Time tab, Overlay Reference, lock-X-to-duration, and Save Outputs (`.mat` of logged plant/forcing data) are in place. Encoder Reset is not required on this kit: Start zeros at the current pose.
 
-## Missing for Labs 1–4
+## Lab 1 leftovers
 
-- Encoder **Reset** and Run / IDLE status
-- **Save Outputs:** `.txt` export, Time vs Frequency, channel picker (force, disp 1/2, velocity, FRF mag/phase 1/2, input trajectory)
+- Time plot for **Cart 2** (live and post-run). L1-E2/E3 Car 2 and Car 3 tests need it; Save already stores `cart2_position`.
+- **Stop Simulation** wired (abort a run without waiting for StopTime).
+- L1-E1 ramps in the manual peak around 4–5 N; the builder still caps at **±3 N** until the new hardware limit is confirmed.
+
+## Missing for Labs 2–4
+
 - `k_sim` / `c_sim` **applied to the plant** when Enabled (the sidebar toggle currently only changes color)
 - **Runs to Average** and **Averaging noise data?**
-- Live **Encoder 1** and **Encoder 2** indicators
-- Time plots for **Cart 2**, **velocity**, and post-run vs live traces (Lab 2: simulated k/c hides live plots until the run finishes)
+- Live **Encoder 1** and **Encoder 2** numeric indicators
+- Time plots for **velocity** (Lab 2: simulated k/c hides live plots until the run finishes)
+- Save: Time vs Frequency channel picker (force, disp 1/2, velocity, FRF mag/phase 1/2, input trajectory)
 - FRF **phase**, second-DOF FRFs, averaging, and **coherence**
 - FRF **peak cursors** / resonant-frequency readout (Lab 4)
 - Time **zoom and cursors** for amplitude ratio (Lab 4)
 - Noise **Generate** button
-- **Stop Simulation** wired
-- Overlay Reference checkbox unwired
 
 ## Lab 5 (later)
 
