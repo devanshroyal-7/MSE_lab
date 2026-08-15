@@ -84,6 +84,19 @@ classdef AppView < handle
             t = sim_input.Time;
             y = squeeze(sim_input.Data);
             obj.TimeDomainPanel.updateReferencePlot(t, y);
+<<<<<<< HEAD
+        end
+
+        function updateResponsePlot(obj, t, y)
+            obj.TimeDomainPanel.updateResponsePlot(t, y);
+        end
+
+        function setSimLampRunning(obj, isRunning)
+            obj.Sidebar.setSimLampRunning(isRunning);
+        end
+
+        function setAppEnabled(obj, tf)
+            obj.Sidebar.setActionButtonsEnabled(tf);
         end
     end
 
@@ -95,6 +108,19 @@ classdef AppView < handle
             end
         end
 
+=======
+        end
+    end
+
+    methods
+        % Callback methods
+        function handleRunSimCallback(obj)
+            if ~isempty(obj.fwdRunSimCallbackView)
+                obj.fwdRunSimCallbackView();
+            end
+        end
+
+>>>>>>> origin/main
         function handleSignalBuilderCallback(obj)
             if ~isempty(obj.fwdSignalBuilderCallbackView)
                 obj.fwdSignalBuilderCallbackView();
@@ -102,7 +128,11 @@ classdef AppView < handle
         end
 
         function handleSaveOutputCallback(obj)
+<<<<<<< HEAD
+            if ~isempty(obj.fwdSaveOutputCallbackView)
+=======
             if ~isempty(obj.fwdSaveOutputCallbackView())
+>>>>>>> origin/main
                 obj.fwdSaveOutputCallbackView();
             end
         end

@@ -27,6 +27,7 @@ classdef SignalBuilderView < handle
         ForcingCanvas
         PanelAdditional
         AdditionalSetup
+        ForceLimit = 3  % [N], copied from SignalBuilderModel
 
         % View Callback functions % these callbacks pass it from overall panel to
         % the SignalBuilderController
@@ -35,6 +36,7 @@ classdef SignalBuilderView < handle
         SelectAvailableCallbackView
         SelectOverallCallbackView
         ValueChangedCallbackView
+        AdditionalChangedCallbackView
         ViewSwitchCallbackView
         FinishCallbackView
     end
@@ -95,6 +97,7 @@ classdef SignalBuilderView < handle
             obj.AdditionalSetup = AdditionalPanel(obj.PanelAdditional);
             
             obj.AdditionalSetup.FinishCallback = @() obj.FinishCallbackView();
+            obj.AdditionalSetup.ValueChangedCallback = @() obj.fwdAdditionalChangedCallback();
         end
 
         function layoutComponents(obj)
@@ -116,6 +119,13 @@ classdef SignalBuilderView < handle
     methods
         function updatePlot(obj, t, y)
             plot(obj.Plot, t, y);
+            hold(obj.Plot, "on");
+            yline(obj.Plot, obj.ForceLimit, "r", "LineWidth", 3);
+            yline(obj.Plot, -obj.ForceLimit, "r", "LineWidth", 3);
+            hold(obj.Plot, "off");
+
+            yl = ylim(obj.Plot);
+            ylim(obj.Plot, [min(yl(1), -obj.ForceLimit), max(yl(2), obj.ForceLimit)]);
         end
 
         function swapActivePanel(obj, panelName)
@@ -166,6 +176,22 @@ classdef SignalBuilderView < handle
                 end
             end
         end
+
+        function params = readAdditionalPanel(obj)
+            panel = obj.AdditionalSetup;
+            params = struct( ...
+                "Offset", panel.OffsetEditField.Value, ...
+                "DelayBefore", panel.DelayEditField.Value, ...
+                "DelayAfter", panel.DwellEditField.Value, ...
+                "RepeatCycles", panel.RepeatEditField.Value);
+        end
+
+        function syncAdditionalPanel(obj, offset, delayBefore, delayAfter, repeatCycles)
+            obj.AdditionalSetup.OffsetEditField.Value = offset;
+            obj.AdditionalSetup.DelayEditField.Value = delayBefore;
+            obj.AdditionalSetup.DwellEditField.Value = delayAfter;
+            obj.AdditionalSetup.RepeatEditField.Value = repeatCycles;
+        end
     end
 
     methods
@@ -208,6 +234,12 @@ classdef SignalBuilderView < handle
             end
         end
 
+        function fwdAdditionalChangedCallback(obj)
+            if ~isempty(obj.AdditionalChangedCallbackView)
+                obj.AdditionalChangedCallbackView();
+            end
+        end
+
         function fwdFinishCallback(obj)
             if ~isempty(obj.FinishCallbackView)
                 obj.FinishCallbackView
@@ -216,6 +248,7 @@ classdef SignalBuilderView < handle
 
         function resetView(obj)
             obj.OverallListWidget.resetOverallWidget();
+            obj.AdditionalSetup.resetPanel();
             
             obj.swapActivePanel('Custom');
         end

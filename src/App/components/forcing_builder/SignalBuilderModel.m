@@ -7,7 +7,8 @@ classdef SignalBuilderModel < handle
 
     >> model = SignalBuilderModel;
     >> model.addSignal(StepSignal(2, 5, 5));
-    >> [t, y] = model.compileCompositeSignal;
+    >> model.RepeatCycles = 3;
+    >> [t, y] = model.compileFinalSignal;
     >> plot(t, y);
 
     % To view the signals currently added:
@@ -22,10 +23,21 @@ classdef SignalBuilderModel < handle
     properties
         Signals = {}
         SampleRate = 1000
+
+        Offset = 0          % [N] DC offset applied to the composite only
+        DelayBefore = 0     % [s] leading zeros before the composite
+        DelayAfter = 0      % [s] trailing zeros after the composite
+        RepeatCycles = 1    % copies of (delay + composite + dwell)
+    end
+
+    properties (Constant)
+        ForceLimit = 3  % [N]
     end
     
     properties (Dependent)
         TotalDuration
+        CycleDuration
+        NumCycles
     end
 
     methods
@@ -80,6 +92,33 @@ classdef SignalBuilderModel < handle
             end
         end
 
+        function n = get.NumCycles(obj)
+            n = max(1, round(obj.RepeatCycles));
+        end
+
+        function td = get.CycleDuration(obj)
+            td = obj.DelayBefore + obj.TotalDuration + obj.DelayAfter;
+        end
+
+        function [t, y] = compileFinalSignal(obj)
+            % Offset, delay-before, dwell-after, then repeat that cycle.
+            [~, y0] = obj.compileCompositeSignal();
+            y0 = y0(:).' + obj.Offset;
+
+            nBefore = max(0, round(obj.DelayBefore * obj.SampleRate));
+            nAfter = max(0, round(obj.DelayAfter * obj.SampleRate));
+            cycle = [zeros(1, nBefore), y0, zeros(1, nAfter)];
+
+            if isempty(cycle)
+                t = [];
+                y = [];
+                return;
+            end
+
+            y = repmat(cycle, 1, obj.NumCycles);
+            t = (0:numel(y)-1) / obj.SampleRate;
+        end
+
         function [t, y] = evaluateIndividualSignal(obj, idx)
             % Preview one stacked signal on its own duration (Single plot mode).
             dt = 1/obj.SampleRate;
@@ -101,8 +140,16 @@ classdef SignalBuilderModel < handle
             y = SigObject.evaluate(t);
         end
 
+        function tf = exceedsForceLimit(obj, y)
+            tf = ~isempty(y) && any(abs(y) > obj.ForceLimit);
+        end
+
         function resetModel(obj)
             obj.Signals = {};
+            obj.Offset = 0;
+            obj.DelayBefore = 0;
+            obj.DelayAfter = 0;
+            obj.RepeatCycles = 1;
         end
     end
 end

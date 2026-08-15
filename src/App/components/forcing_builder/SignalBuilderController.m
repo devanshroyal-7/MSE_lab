@@ -27,6 +27,7 @@ classdef SignalBuilderController < handle
         function obj = SignalBuilderController(model, view)
             obj.Model = model;
             obj.View = view;
+            obj.View.ForceLimit = obj.Model.ForceLimit;
 
             obj.ModelListeners = addlistener(obj.Model, 'DataUpdated', @(~, ~) obj.handleModelUpdated);
             
@@ -36,6 +37,7 @@ classdef SignalBuilderController < handle
             obj.View.SelectAvailableCallbackView = @(value) obj.handleSelectAvailableCallback(value);
             obj.View.SelectOverallCallbackView = @(idx, swapFlag) obj.handleSelectOverallCallback(idx, swapFlag);
             obj.View.ValueChangedCallbackView = @() obj.handleValueChangedCallback();
+            obj.View.AdditionalChangedCallbackView = @() obj.handleAdditionalChangedCallback();
             obj.View.ViewSwitchCallbackView = @() obj.handleViewSwitchChangedCallback();
             obj.View.FinishCallbackView = @() obj.handleFinishCallback();
             
@@ -88,7 +90,7 @@ classdef SignalBuilderController < handle
 
                 [t, y] = obj.Model.evaluateIndividualSignal(selectedSigIdx);
             else
-                [t, y] = obj.Model.compileCompositeSignal();
+                [t, y] = obj.Model.compileFinalSignal();
             end
 
 
@@ -159,9 +161,40 @@ classdef SignalBuilderController < handle
             obj.syncViewToModel();
         end
 
-        function handleFinishCallback(obj)
-            obj.IsFinished = true;
+        function handleAdditionalChangedCallback(obj)
+            obj.copyAdditionalPanelToModel();
+            obj.syncViewToModel();
+        end
 
+<<<<<<< HEAD
+        function handleFinishCallback(obj)
+            obj.copyAdditionalPanelToModel();
+
+            if isempty(obj.Model.Signals)
+                selection = uiconfirm(obj.View.UIFigure, ...
+                    "No signal was added. Do you want to exit without making changes or return to Signal Builder?", ...
+                    "No Signal Added", ...
+                    "Options", ["Exit without making changes", "Return to Signal Builder"], ...
+                    "DefaultOption", "Return to Signal Builder", ...
+                    "CancelOption", "Return to Signal Builder", ...
+                    "Icon", "warning");
+                if strcmp(selection, "Exit without making changes")
+                    uiresume(obj.View.UIFigure);
+                end
+                return;
+            end
+
+            [~, y] = obj.Model.compileFinalSignal();
+            if obj.Model.exceedsForceLimit(y)
+                uialert(obj.View.UIFigure, ...
+                    "Can't set the provided forcing function because it exceeds the limits.", ...
+                    "Limit Exceeded", "Icon", "error");
+                return;
+            end
+
+            obj.IsFinished = true;
+=======
+>>>>>>> origin/main
             uiresume(obj.View.UIFigure);   % unblocks SignalBuilderApp's uiwait
         end
 
@@ -175,6 +208,14 @@ classdef SignalBuilderController < handle
     end
 
     methods (Access = private)
+        function copyAdditionalPanelToModel(obj)
+            params = obj.View.readAdditionalPanel();
+            obj.Model.Offset = params.Offset;
+            obj.Model.DelayBefore = params.DelayBefore;
+            obj.Model.DelayAfter = params.DelayAfter;
+            obj.Model.RepeatCycles = params.RepeatCycles;
+        end
+
         function handleModelUpdated(obj)
             obj.syncViewToModel();
         end

@@ -6,8 +6,12 @@ classdef SidebarPanel < handle
     %{
     Example usage:
 
+<<<<<<< HEAD
+    >> fig = uifigure("Position", [100, 100, 320, 640]); panel = SidebarPanel(fig);
+=======
     >> fig = uifigure("Position", [100, 100, 320, 640]);
     >> panel = SidebarPanel(fig);
+>>>>>>> origin/main
     >> panel.KSimEditField.Value = 200;
     >> panel.fwdRunSignalCallback = @() disp("start");
 
@@ -30,6 +34,10 @@ classdef SidebarPanel < handle
 
         CreateFcnButton
         SaveOutputButton
+<<<<<<< HEAD
+        SimLamp
+=======
+>>>>>>> origin/main
 
         % Fwd Callbacks
         fwdRunSignalCallback
@@ -49,8 +57,21 @@ classdef SidebarPanel < handle
                 "Text", "Simulation Controls", ...
                 "FontWeight", "bold", ...
                 "FontSize", 15);
-            SimControlLabel.Layout.Column = [1, 4];
-            SimControlLable.Layout.Row = 1;
+            SimControlLabel.Layout.Column = [1, 2];
+            SimControlLabel.Layout.Row = 1;
+
+            padSimLamp = uigridlayout(obj.MainLayoutGrid, [1, 4]);
+            padSimLamp.Padding = [0, 0, 0, 0];
+            padSimLamp.Layout.Row = 1;
+            padSimLamp.Layout.Column = [3, 4];
+            
+            simLable = uilabel(padSimLamp, ...
+                "Text", "Simulation Status", ...
+                "HorizontalAlignment", 'right');
+            simLable.Layout.Column = [1, 3];
+
+            obj.SimLamp = uilamp(padSimLamp, "Color", [0 1 0]);
+            obj.SimLamp.Layout.Column = 4;
 
             % Start Simulation
             obj.SimStartButton = uibutton(obj.MainLayoutGrid, ...
@@ -218,5 +239,30 @@ classdef SidebarPanel < handle
                 obj.fwdSaveOutputCallback();
             end
         end
+<<<<<<< HEAD
+
+        function setSimLampRunning(obj, isRunning)
+            if isRunning
+                obj.SimLamp.Color = [1 0 0];
+            else
+                obj.SimLamp.Color = [0 1 0];
+            end
+        end
+
+        function setActionButtonsEnabled(obj, tf)
+            if tf
+                enableVal = 'on';
+            else
+                enableVal = 'off';
+            end
+
+            obj.SimStartButton.Enable = enableVal;
+            obj.CreateFcnButton.Enable = enableVal;
+            obj.SaveOutputButton.Enable = enableVal;
+            obj.EnableSimParamButton.Enable = enableVal;
+            obj.EnableControlsButton.Enable = enableVal;
+        end
+=======
+>>>>>>> origin/main
     end
 end
