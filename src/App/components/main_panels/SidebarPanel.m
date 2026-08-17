@@ -6,12 +6,7 @@ classdef SidebarPanel < handle
     %{
     Example usage:
 
-<<<<<<< HEAD
     >> fig = uifigure("Position", [100, 100, 320, 640]); panel = SidebarPanel(fig);
-=======
-    >> fig = uifigure("Position", [100, 100, 320, 640]);
-    >> panel = SidebarPanel(fig);
->>>>>>> origin/main
     >> panel.KSimEditField.Value = 200;
     >> panel.fwdRunSignalCallback = @() disp("start");
 
@@ -34,10 +29,7 @@ classdef SidebarPanel < handle
 
         CreateFcnButton
         SaveOutputButton
-<<<<<<< HEAD
         SimLamp
-=======
->>>>>>> origin/main
 
         % Fwd Callbacks
         fwdRunSignalCallback
@@ -239,7 +231,6 @@ classdef SidebarPanel < handle
                 obj.fwdSaveOutputCallback();
             end
         end
-<<<<<<< HEAD
 
         function setSimLampRunning(obj, isRunning)
             if isRunning
@@ -262,7 +253,5 @@ classdef SidebarPanel < handle
             obj.EnableSimParamButton.Enable = enableVal;
             obj.EnableControlsButton.Enable = enableVal;
         end
-=======
->>>>>>> origin/main
     end
 end

@@ -80,7 +80,6 @@ classdef AppModel < handle
             set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
 
             drawnow;
-<<<<<<< HEAD
         end
 
         function prepareLiveStreaming(obj)
@@ -140,15 +139,12 @@ classdef AppModel < handle
 
             obj.prepareLiveStreaming();
             set_param(modelName, 'SimulationCommand', 'connect');
-=======
->>>>>>> origin/main
         end
 
         function startSimulation(obj)
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
-<<<<<<< HEAD
             obj.LiveArmed = false;
             obj.StaleSdiRunId = obj.currentSdiRunId();
 
@@ -183,13 +179,6 @@ classdef AppModel < handle
                     run.(name) = evalin('base', name);
                 end
             end
-=======
-            
-            % Desktop Real-Time / external mode; plant reads sim_input from base
-            set_param(obj.SimulationModelName, 'SimulationMode', 'external');
-            
-            set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
->>>>>>> origin/main
         end
 
         function status = getSimulationStatus(obj)
@@ -203,7 +192,6 @@ classdef AppModel < handle
         function isRunning = isSimulationRunning(obj)
             status = obj.getSimulationStatus();
             isRunning = strcmp(status, 'running') || strcmp(status, 'external');
-<<<<<<< HEAD
         end
     end
 
@@ -338,8 +326,6 @@ classdef AppModel < handle
                 t = t(1:n);
                 y = y(1:n);
             end
-=======
->>>>>>> origin/main
         end
     end
 end

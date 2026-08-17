@@ -1,12 +1,7 @@
 classdef AppController < handle
     % Glue between AppModel and AppView. Start Simulation compiles/connects
-<<<<<<< HEAD
     % Desktop Real-Time and waits until stop or a 30 s timeout. Create Forcing
     % Function opens SignalBuilderApp. Save Output writes a .mat of logged data.
-=======
-    % Desktop Real-Time; Create Forcing Function opens SignalBuilderApp and
-    % draws the result on the reference plot. Save Output is still a stub.
->>>>>>> origin/main
     %
     %{
     Example usage:
@@ -37,15 +32,12 @@ classdef AppController < handle
 
         function handleRunSimCallback(obj)
             figHandle = obj.View.UIFigure;
-<<<<<<< HEAD
             timeout_s = obj.Model.RunTimeout;
             d = [];
 
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
             obj.View.updateResponsePlot([], []);
-=======
->>>>>>> origin/main
 
             try
                 d = uiprogressdlg(figHandle, ...
@@ -54,7 +46,6 @@ classdef AppController < handle
                     "Indeterminate", "on");
                 drawnow;
 
-<<<<<<< HEAD
                 tConnect = tic;
                 obj.Model.connectTarget();
 
@@ -98,33 +89,6 @@ classdef AppController < handle
 
             obj.View.setSimLampRunning(false);
             obj.View.setAppEnabled(true);
-=======
-                obj.Model.startSimulation();
-                
-                while true
-                    if obj.Model.isSimulationRunning() || strcmp(obj.Model.getSimulationStatus(), 'stopped')
-                        break;
-                    end
-
-                    pause(0.1)
-                end
-
-                close(d);
-
-                if obj.Model.isSimulationRunning()
-                    disp('Simulation is running')
-                    % start(obj.StreamingTimer)
-                else
-                    errordlg("Model failed to enter real-time execution", "Target Error");
-                end
-
-            catch ME
-                if exist('d', 'var') && isvalid(d)
-                    close(d);
-                end 
-                errordlg(ME.message, 'Simulation Launch Failed');
-            end
->>>>>>> origin/main
         end
 
         function handleSignalBuilderCallback(obj)
@@ -144,7 +108,6 @@ classdef AppController < handle
         end
 
         function handleSaveOutputCallback(obj)
-<<<<<<< HEAD
             [file, path] = uiputfile('*.mat', 'Save run data');
             if isequal(file, 0)
                 return;
@@ -170,9 +133,6 @@ classdef AppController < handle
                 return;
             end
             obj.View.updateResponsePlot(t, y);
-=======
-            % obj
->>>>>>> origin/main
         end
     end
 end

@@ -1,11 +1,6 @@
 classdef AdditionalPanel < handle
-<<<<<<< HEAD
     % Offset / delay / dwell / repeat fields plus Finish. These apply to the
     % stacked composite (compileFinalSignal), not to each BaseSignal.
-=======
-    % Offset / delay / dwell / repeat fields plus Finish. Values are collected
-    % here but not yet copied onto BaseSignal by the controller.
->>>>>>> origin/main
     %
     %{
     Example usage:
