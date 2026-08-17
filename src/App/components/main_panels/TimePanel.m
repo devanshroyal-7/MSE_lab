@@ -56,7 +56,7 @@ classdef TimePanel < handle
             padCheckbox.Padding = [0, 0, 0, 10];
             padCheckbox.Layout.Column = [1 2];
             padCheckbox.Layout.Row = 3;
-            padCheckbox.ColumnWidth = {'1x', 150, 160, 140};
+            padCheckbox.ColumnWidth = {'1x', 140, 160, 140};
 
             obj.YLimCheckBox = uicheckbox(padCheckbox, ...
                 "Text", "Lock Y-axis Limits", ...
