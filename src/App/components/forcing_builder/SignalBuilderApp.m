@@ -32,12 +32,9 @@ function tsData = SignalBuilderApp()
         [t, y] = model.compileFinalSignal();
 
         tsData = timeseries(y, t);
-<<<<<<< HEAD
         tsData.UserData = struct( ...
             "CycleDuration", model.CycleDuration, ...
             "NumCycles", model.NumCycles);
-=======
->>>>>>> origin/main
     end
 
     delete(controller)
