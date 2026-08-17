@@ -20,6 +20,7 @@ classdef TimePanel < handle
         ReferencePlot
         OverlayCheckBox
         AutoscaleCheckBox
+        YLimCheckBox
         SignalButton          % reserved; not created in the constructor yet
 
         % Cached line handles so streaming can set XData/YData without new plot()
@@ -27,6 +28,7 @@ classdef TimePanel < handle
         RespLineHandle
         OverlayLineHandle
         SimDuration (1,1) double = 0.1
+        ResponseYLimits (1,2) double = [-0.03, 0.03]
     end
     methods
         function obj = TimePanel(parentContainer)
@@ -54,7 +56,13 @@ classdef TimePanel < handle
             padCheckbox.Padding = [0, 0, 0, 10];
             padCheckbox.Layout.Column = [1 2];
             padCheckbox.Layout.Row = 3;
-            padCheckbox.ColumnWidth = {'1x', '1x', 150, 140};
+            padCheckbox.ColumnWidth = {'1x', 150, 160, 140};
+
+            obj.YLimCheckBox = uicheckbox(padCheckbox, ...
+                "Text", "Lock Y-axis Limits", ...
+                "Value", true, ...
+                "ValueChangedFcn", @(~,~) obj.applyResponseYLim());
+            obj.YLimCheckBox.Layout.Column = 2;
 
             obj.AutoscaleCheckBox = uicheckbox(padCheckbox, ...
                 "Text", "Lock X-axis to Duration", ...
@@ -90,7 +98,7 @@ classdef TimePanel < handle
             obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
             xlabel(obj.ResponsePlot, 'Time (s)');
             ylabel(obj.ResponsePlot, 'Displacement (m)');
-            ylim(obj.ResponsePlot, [-0.03, 0.03]);
+            obj.applyResponseYLim();
 
             yyaxis(obj.ResponsePlot, 'right');
             obj.OverlayLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
@@ -102,6 +110,11 @@ classdef TimePanel < handle
 
         function setReferenceQuantity(obj, quantity)
             ylabel(obj.ReferencePlot, quantity.PlotYLabel);
+        end
+
+        function setResponseYLimits(obj, limits)
+            obj.ResponseYLimits = limits;
+            obj.applyResponseYLim();
         end
 
         function updateReferencePlot(obj, t, y)
@@ -130,6 +143,14 @@ classdef TimePanel < handle
     end
 
     methods (Access = private)
+        function applyResponseYLim(obj)
+            yyaxis(obj.ResponsePlot, 'left');
+            if obj.YLimCheckBox.Value
+                ylim(obj.ResponsePlot, obj.ResponseYLimits);
+            else
+                ylim(obj.ResponsePlot, 'auto');
+            end
+        end
         function applyOverlay(obj)
             yyaxis(obj.ResponsePlot, 'right');
             if obj.OverlayCheckBox.Value
