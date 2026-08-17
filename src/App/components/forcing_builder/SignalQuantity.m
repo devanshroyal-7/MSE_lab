@@ -16,7 +16,7 @@ classdef SignalQuantity
     %}
 
     properties (Constant)
-        ForceLimit = 3              % [N] motor / command cap
+        ForceLimit = 4              % [N] motor / command cap
         DisplacementLimit = 20      % [mm] travel; confirm hardware
     end
 
