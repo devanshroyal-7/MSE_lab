@@ -90,6 +90,7 @@ classdef TimePanel < handle
             obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
             xlabel(obj.ResponsePlot, 'Time (s)');
             ylabel(obj.ResponsePlot, 'Displacement (m)');
+            ylim(obj.ResponsePlot, [-0.03, 0.03]);
 
             yyaxis(obj.ResponsePlot, 'right');
             obj.OverlayLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
