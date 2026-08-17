@@ -6,18 +6,24 @@ Self-contained MVC app that lets a student pick waveform types, edit parameters,
 
 ```matlab
 addpath(genpath('src/App'));
-tsData = SignalBuilderApp;    % blocks until Finish or the window is closed
+tsData = SignalBuilderApp;    % force [N]; blocks until Finish or close
 plot(tsData);
+
+tsData = SignalBuilderApp("Mode", "reference");   % mm + travel limit
+
 ```
 
-On **Finish Signal Building**, `tsData` is the superimposed force. Closing without Finish returns an empty `timeseries` (`Length == 0`). The main app's `AppController` then calls `AppModel.setForcingInput`, which writes `sim_input` in the base workspace.
+On **Finish Signal Building**, `tsData` is the superimposed waveform. Closing without Finish returns an empty `timeseries` (`Length == 0`). The main app's `AppController` then calls `AppModel.setForcingInput`, which writes `sim_input` in the base workspace. `tsData.UserData` records `Quantity` (`"force"` or `"reference"`) and `Unit` (`"N"` or `"mm"`) so a leftover 3 N step cannot be treated as 3 mm.
+
+`Mode` is chosen when the window opens. Force is commanded force [N], limit **3 N**. Reference is a displacement trajectory [mm] used when the controller is on, limit **20 mm** (`SignalQuantity.DisplacementLimit`; confirm hardware). Waveform math is unitless; only labels, y-limit lines, and the Finish alert change.
 
 To drive the widgets from code instead of the full app:
 
 ```matlab
 fig = uifigure("Name", "Forcing Function Builder", "Position", [500, 500, 940, 630]);
-model = SignalBuilderModel;
-view = SignalBuilderView(fig);
+q = SignalQuantity.force;                 % or SignalQuantity.reference
+model = SignalBuilderModel(q);
+view = SignalBuilderView(fig, q);
 controller = SignalBuilderController(model, view);
 ```
 
@@ -35,7 +41,8 @@ model.Signals
 
 ```
 forcing_builder/
-  SignalBuilderApp.m          % uifigure + uiwait; returns timeseries
+  SignalQuantity.m            % force [N] vs reference [mm]: units, limit, UI copy
+  SignalBuilderApp.m          % uifigure + uiwait; "Mode","force"|"reference"
   SignalBuilderModel.m        % cell array of BaseSignal; superposition
   SignalBuilderView.m         % 2x3 grid: plot, lists, setup, extras
   SignalBuilderController.m   % listeners + callback handles
@@ -52,7 +59,7 @@ forcing_builder/
 | Row 2, col 2 | Function Setup — one of `*Panel` swapped in by name |
 | Row 2, col 3 | `AdditionalPanel` — offset/delay/dwell/repeat + Finish |
 
-`SignalBuilderView.swapActivePanel(name)` deletes the current setup grid and constructs `CustomPanel`, `NoisePanel`, `RampPanel`, `SinePanel`, `StepPanel`, `SweptSinePanel`, or `ZeroOutputPanel`.
+`SignalBuilderView.swapActivePanel(name)` deletes the current setup grid and constructs `CustomPanel`, `NoisePanel`, `RampPanel`, `SinePanel`, `StepPanel`, `SweptSinePanel`, or `ZeroOutputPanel`, passing the view's `SignalQuantity` so amplitude/magnitude/slope/offset labels use N or mm.
 
 ## Data flow
 
@@ -95,6 +102,8 @@ sequenceDiagram
 
 | Property / method | Behavior |
 | --- | --- |
+| `Quantity` | `SignalQuantity` (force vs reference). Sets `AmplitudeLimit`. |
+| `AmplitudeLimit` | Reject Finish and draw red y-lines at `±Limit` (3 N or 20 mm) |
 | `Signals` | Cell array of `BaseSignal` objects |
 | `SampleRate` | Default 1000 Hz; sets `dt` for compiled vectors |
 | `TotalDuration` | **Max** of each signal’s `TotalDuration`, not the sum |
@@ -112,7 +121,7 @@ Every function-setup panel implements:
 
 | Method | Purpose |
 | --- | --- |
-| `panel = XxxPanel(parent)` | Build controls in `parent` (the Function Setup canvas) |
+| `panel = XxxPanel(parent, quantity)` | Build controls in `parent`. Optional `quantity` (`SignalQuantity`) sets N vs mm labels; default is force. |
 | `populate(signal)` | Copy a `XxxSignal` into the edit fields (Overall-list select) |
 | `createSignal()` | Build a `XxxSignal` from the current fields (Add / live preview) |
 | `parameterChanged()` | Call `ValueChangedCallback` so the controller refreshes the plot |
@@ -131,7 +140,7 @@ Example: add a triangle wave named `"Triangle"`.
 
    ```matlab
    case "Triangle"
-       obj.ActiveSetupPanel = TrianglePanel(obj.ForcingCanvas);
+       obj.ActiveSetupPanel = TrianglePanel(obj.ForcingCanvas, obj.Quantity);
    ```
 
 4. **Available list** — in `OverallPanel` constructor, append `"Triangle"` to `AvailableListBox` `"Items"`. The string **must match** `TriangleSignal.Name` and the `case` label.
@@ -150,6 +159,6 @@ No change to `SignalBuilderModel` is required: it only depends on `BaseSignal`.
 | `SelectOverallCallbackView` | `handleSelectOverallCallback` (`populate` + optional swap) |
 | `ValueChangedCallbackView` | `handleValueChangedCallback` |
 | `ViewSwitchCallbackView` | `handleViewSwitchChangedCallback` → `syncViewToModel` |
-| `FinishCallbackView` | `handleFinishCallback` → `IsFinished = true`, `uiresume` |
+| `FinishCallbackView` | `handleFinishCallback` → `exceedsAmplitudeLimit`, then `IsFinished = true`, `uiresume` |
 
 `syncViewToModel` is the single place that copies `Model.Signals` names into the Overall list and redraws the plot.

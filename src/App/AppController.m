@@ -1,7 +1,8 @@
 classdef AppController < handle
     % Glue between AppModel and AppView. Start Simulation compiles/connects
     % Desktop Real-Time and waits until stop or a 30 s timeout. Create Forcing
-    % Function opens SignalBuilderApp. Save Output writes a .mat of logged data.
+    % Function (or Create Reference Trajectory when the controller is on) opens
+    % SignalBuilderApp. Save Output writes a .mat of logged data.
     %
     %{
     Example usage:
@@ -28,6 +29,7 @@ classdef AppController < handle
             obj.View.fwdRunSimCallbackView = @() obj.handleRunSimCallback();
             obj.View.fwdSignalBuilderCallbackView = @() obj.handleSignalBuilderCallback();
             obj.View.fwdSaveOutputCallbackView = @() obj.handleSaveOutputCallback();
+            obj.View.fwdEnableControlsCallbackView = @(enabled) obj.handleEnableControlsCallback(enabled);
         end
 
         function handleRunSimCallback(obj)
@@ -92,19 +94,38 @@ classdef AppController < handle
         end
 
         function handleSignalBuilderCallback(obj)
-            sim_input  = SignalBuilderApp();
+            if obj.View.controlsEnabled()
+                mode = "reference";
+            else
+                mode = "force";
+            end
+
+            sim_input = SignalBuilderApp("Mode", mode);
 
             if ~isempty(sim_input) && isa(sim_input, 'timeseries') && sim_input.Length > 0
                 obj.Model.setForcingInput(sim_input);
                 stopTime = sim_input.Time(end);
-                
+
                 obj.View.updateReferencePlot(sim_input)
 
-                fprintf('Forcing signal successfully set. Duration %.2f seconds.\n', stopTime);
+                fprintf('Signal successfully set (%s). Duration %.2f seconds.\n', ...
+                    mode, stopTime);
             else
                 fprintf('Signal Builder closed without saving changes.\n');
             end
-            
+        end
+
+        function handleEnableControlsCallback(obj, enabled)
+            if enabled
+                quantity = SignalQuantity.reference();
+            else
+                quantity = SignalQuantity.force();
+            end
+
+            obj.View.setSignalBuilderButtonText(quantity.sidebarButtonText);
+            obj.View.setReferenceQuantity(quantity);
+            obj.Model.clearForcingInput();
+            obj.View.clearReferencePlot();
         end
 
         function handleSaveOutputCallback(obj)

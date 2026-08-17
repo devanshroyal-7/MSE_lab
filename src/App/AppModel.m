@@ -82,6 +82,17 @@ classdef AppModel < handle
             drawnow;
         end
 
+        function clearForcingInput(obj)
+            % Drop a leftover force or reference so toggling the controller
+            % cannot send 3 N as 3 mm (or the reverse).
+            obj.ForcingSignal = timeseries();
+            obj.S = 10;
+            assignin('base', 'sim_input', obj.ForcingSignal);
+            if bdIsLoaded(obj.SimulationModelName)
+                set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
+            end
+        end
+
         function prepareLiveStreaming(obj)
             % SLDRT Run in Kernel uploads Duration-sized buffers. By default
             % only the last buffer is written to the workspace, which is why

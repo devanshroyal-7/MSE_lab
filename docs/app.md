@@ -9,7 +9,7 @@ Student-facing window under `src/App/`. Recommended figure size is **1900 × 900
 | `main.m` | Entry point. Creates the figure, constructs model/view/controller, registers `CloseRequestFcn`. |
 | `AppModel.m` | Loads `MSE_PLANT`, writes hardware constants and `sim_input` to base, starts external-mode simulation, reports run status. |
 | `AppView.m` | Grid: title + ROBOTS5 logo, Time / Frequency / Controls tabs, sidebar. Forwards sidebar callbacks to the controller. |
-| `AppController.m` | Start Simulation (progress dialog + `startSimulation`); Create Forcing Function (`SignalBuilderApp` + reference plot). Save Output is still empty. |
+| `AppController.m` | Start Simulation (progress dialog + `startSimulation`); Create Forcing Function / Create Reference Trajectory (`SignalBuilderApp` + reference plot). Save Output writes a `.mat`. |
 | `components/main_panels/TimePanel.m` | Response plot (top) and reference plot (bottom). Cached line handles; `updateReferencePlot` / `updateResponsePlot`. |
 | `components/main_panels/FrequencyPanel.m` | Forcing FFT, response FFT, FRF axes. |
 | `components/main_panels/SidebarPanel.m` | Start/Stop, simulated k/c, PID, Create Forcing Function, Save Outputs. |
@@ -74,7 +74,8 @@ Callback chain:
 | Sidebar action | Controller method |
 | --- | --- |
 | Start Simulation | `handleRunSimCallback` — indeterminate progress dialog, `Model.startSimulation`, poll until running or stopped |
-| Create Forcing Function | `handleSignalBuilderCallback` — `SignalBuilderApp()`, then `setForcingInput` and `updateReferencePlot` if `Length > 0` |
+| Create Forcing Function | `handleSignalBuilderCallback` — `SignalBuilderApp("Mode", ...)` from Enable Controller, then `setForcingInput` and `updateReferencePlot` if `Length > 0` |
+| Enable Controller | `handleEnableControlsCallback` — retitle the builder button, switch TimePanel ylabel to N or mm, clear `sim_input` |
 | Save Outputs | `handleSaveOutputCallback` — stub |
 
 `uiwait` is **not** used on the main figure (it delayed simulation). The forcing builder still uses `uiwait` internally.
@@ -85,14 +86,14 @@ Four blocks:
 
 1. **Simulation Controls** — Start / Stop. Start forwards `fwdRunSignalCallback`. Stop has no callback yet.
 2. **Simulated Parameters** — `k_simulated` [N/m], `c_simulated` [N·s/m], enable state button (red DISABLED / green ENABLED). The toggle only changes appearance.
-3. **Control Parameters** — `Kp`, `Ki`, `Kd`, same enable pattern. Not written to the plant.
-4. **Create Forcing Function** / **Save Outputs** on the bottom row.
+3. **Control Parameters** — `Kp`, `Ki`, `Kd`, Enable Controller. Enabling switches the builder to mm reference mode and clears any leftover force signal.
+4. **Create Forcing Function** / **Save Outputs** on the bottom row. The create button becomes **Create Reference Trajectory** while the controller is on.
 
-`enableSimParamCallback` / `enableControlCallback` are the place to later `assignin` gains and call `set_param`.
+`enableSimParamCallback` only changes the simulated-parameter button color. `enableControlCallback` updates the controller button and forwards to `AppController`, which retitles the builder button, switches the TimePanel ylabel, and clears `sim_input`. Gains are not written to the plant yet.
 
 ## TimePanel and FrequencyPanel
 
-`TimePanel` keeps `RefLineHandle` / `RespLineHandle` so updates are `set(h, 'XData', t, 'YData', y)` instead of a new `plot`. After **Create Forcing Function**, the controller calls `updateReferencePlot`. Response streaming is not wired yet.
+`TimePanel` keeps `RefLineHandle` / `RespLineHandle` so updates are `set(h, 'XData', t, 'YData', y)` instead of a new `plot`. After **Create Forcing Function**, the controller calls `updateReferencePlot`. The reference ylabel follows `SignalQuantity` (`Force (N)` or `Displacement (mm)`). Overlay-on-response stays force for now. Response streaming is not wired yet.
 
 `FrequencyPanel` is still display-only. After a run, a future controller should compute FFTs and FRF = response / forcing.
 

@@ -5,7 +5,7 @@ MATLAB software for **24-452 Mechanical Systems Experimentation** at CMU. Studen
 ## Highlights
 
 - **Plant** — `MSE_PLANT.slx` runs in Desktop Real-Time (external) mode and reads force, stiffness, and damping from the MATLAB base workspace.
-- **Forcing function builder** — `SignalBuilderApp` stacks sine, step, ramp, swept sine, band-limited noise, custom \(F(t)\), and zero-output, then returns a `timeseries`. The main app writes that to `sim_input`.
+- **Forcing function builder** — `SignalBuilderApp` stacks sine, step, ramp, swept sine, band-limited noise, custom \(F(t)\), and zero-output, then returns a `timeseries`. With the controller on, the same builder is a reference trajectory in mm. The main app writes that to `sim_input`.
 - **Student app** — `src/App/` is an MVC window with time/frequency tabs and a sidebar. **Start Simulation** compiles and connects Desktop Real-Time; **Create Forcing Function** opens the builder and plots the result as the reference.
 - **Labs** — Live scripts (`Lab_1.mlx`, `lab_3.m`, …) build the same `sim_input` by hand and start the plant. Five labs; each has or will have the minimum code to run the kit.
 - **Same contract everywhere** — Labs, `AppModel.setForcingInput`, and the lab scripts all write `sim_input`, `k_sim`, and `b_sim` into the base workspace for `MSE_PLANT`.
@@ -27,12 +27,13 @@ addpath('src');
 main
 ```
 
-That opens a 1900×900 figure, loads `MSE_PLANT`, and wires the sidebar. **Create Forcing Function** runs `SignalBuilderApp`; **Start Simulation** builds/connects Desktop Real-Time (hardware must be attached).
+That opens a 1900×900 figure, loads `MSE_PLANT`, and wires the sidebar. **Create Forcing Function** runs `SignalBuilderApp` in force mode; **Enable Controller** switches that button to **Create Reference Trajectory** (mm). **Start Simulation** builds/connects Desktop Real-Time (hardware must be attached).
 
 ### 2. Build a forcing function alone
 
 ```matlab
 tsData = SignalBuilderApp;   % blocks until Finish or the window is closed
+tsData = SignalBuilderApp("Mode", "reference");   % mm + travel limit
 ```
 
 Add waveforms, preview Single vs Overall, then **Finish Signal Building**. That returns a `timeseries`. Closing without Finish returns an empty timeseries (`Length == 0`).

@@ -7,6 +7,7 @@ classdef AdditionalPanel < handle
 
     >> fig = uifigure;
     >> panel = AdditionalPanel(fig);
+    >> panel = AdditionalPanel(fig, SignalQuantity.reference);
     >> panel.FinishCallback = @() disp("done");
     >> panel.OffsetEditField.Value
 
@@ -30,12 +31,16 @@ classdef AdditionalPanel < handle
     end
 
     methods
-        function obj = AdditionalPanel(parentContainer)
+        function obj = AdditionalPanel(parentContainer, quantity)
+            if nargin < 2 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+
             obj.MainLayoutGrid = uigridlayout(parentContainer, [6, 2]);
             obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 45, 30};
             obj.MainLayoutGrid.ColumnWidth = {130, '1x'};
 
-            obj.OffsetLabel = uilabel(obj.MainLayoutGrid, "Text", "Offset (N)");
+            obj.OffsetLabel = uilabel(obj.MainLayoutGrid, "Text", quantity.offsetLabel);
             obj.OffsetEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0);
             obj.OffsetEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
             

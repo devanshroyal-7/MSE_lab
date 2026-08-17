@@ -6,6 +6,7 @@ classdef RampPanel < handle
 
     >> fig = uifigure;
     >> panel = RampPanel(fig);
+    >> panel = RampPanel(fig, SignalQuantity.reference);
     >> sig = panel.createSignal;
     >> panel.populate(RampSignal(0.4, 10, 0, "beginning", false, false));
 
@@ -23,14 +24,18 @@ classdef RampPanel < handle
     end
 
     methods
-        function obj = RampPanel(parentContainer)
+        function obj = RampPanel(parentContainer, quantity)
+            if nargin < 2 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+
             % Construct the programmatic parameters layout grid
             obj.MainLayoutGrid = uigridlayout(parentContainer, [6, 2]);
             obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30};
             obj.MainLayoutGrid.ColumnWidth = {130, '1x'};
 
             % Render standard fields
-            uilabel(obj.MainLayoutGrid, 'Text', 'Slope (N/s):');
+            uilabel(obj.MainLayoutGrid, 'Text', quantity.slopeLabel);
             obj.SlopeEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 0.2);
             obj.SlopeEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 

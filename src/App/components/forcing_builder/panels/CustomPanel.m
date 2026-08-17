@@ -7,6 +7,7 @@ classdef CustomPanel < handle
 
     >> fig = uifigure;
     >> panel = CustomPanel(fig);
+    >> panel = CustomPanel(fig, SignalQuantity.reference);
     >> panel.CustomEditField.Value = "sin(2*t)";
     >> sig = panel.createSignal;
     >> panel.populate(CustomSignal("0*t", 2));
@@ -25,14 +26,18 @@ classdef CustomPanel < handle
     end
 
     methods
-        function obj = CustomPanel(parentContainer)
+        function obj = CustomPanel(parentContainer, quantity)
+            if nargin < 2 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+
             % Construct the programmatic parameter layout grid
             obj.MainLayoutGrid = uigridlayout(parentContainer, [3, 3]);
             obj.MainLayoutGrid.RowHeight = {30, 90, 30};
             obj.MainLayoutGrid.ColumnWidth = {130, '1x', 30};
 
             % Render standard fields
-            obj.CustomLabel = uilabel(obj.MainLayoutGrid, 'Text', 'Function F(t) in N:');
+            obj.CustomLabel = uilabel(obj.MainLayoutGrid, 'Text', quantity.customExprLabel);
             obj.CustomLabel.Layout.Row = 1;
             obj.CustomLabel.Layout.Column = 1;
 

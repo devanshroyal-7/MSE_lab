@@ -99,6 +99,10 @@ classdef TimePanel < handle
             yyaxis(obj.ResponsePlot, 'left');
         end
 
+        function setReferenceQuantity(obj, quantity)
+            ylabel(obj.ReferencePlot, quantity.PlotYLabel);
+        end
+
         function updateReferencePlot(obj, t, y)
             if isempty(t) || isempty(y)
                 set(obj.RefLineHandle, 'XData', NaN, 'YData', NaN);

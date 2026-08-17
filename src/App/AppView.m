@@ -26,6 +26,7 @@ classdef AppView < handle
         fwdRunSimCallbackView
         fwdSignalBuilderCallbackView
         fwdSaveOutputCallbackView
+        fwdEnableControlsCallbackView
     end
 
     methods
@@ -78,12 +79,33 @@ classdef AppView < handle
             obj.Sidebar.fwdRunSignalCallback = @() obj.handleRunSimCallback();
             obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
+            obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
         end
     
         function updateReferencePlot(obj, sim_input)
             t = sim_input.Time;
             y = squeeze(sim_input.Data);
             obj.TimeDomainPanel.updateReferencePlot(t, y);
+
+            if ~isempty(sim_input.UserData) && isfield(sim_input.UserData, 'Quantity')
+                obj.setReferenceQuantity(SignalQuantity.fromMode(sim_input.UserData.Quantity));
+            end
+        end
+
+        function clearReferencePlot(obj)
+            obj.TimeDomainPanel.updateReferencePlot([], []);
+        end
+
+        function setReferenceQuantity(obj, quantity)
+            obj.TimeDomainPanel.setReferenceQuantity(quantity);
+        end
+
+        function setSignalBuilderButtonText(obj, text)
+            obj.Sidebar.setSignalBuilderButtonText(text);
+        end
+
+        function tf = controlsEnabled(obj)
+            tf = obj.Sidebar.controlsEnabled();
         end
 
         function updateResponsePlot(obj, t, y)
@@ -116,6 +138,12 @@ classdef AppView < handle
         function handleSaveOutputCallback(obj)
             if ~isempty(obj.fwdSaveOutputCallbackView)
                 obj.fwdSaveOutputCallbackView();
+            end
+        end
+
+        function handleEnableControlsCallback(obj, enabled)
+            if ~isempty(obj.fwdEnableControlsCallbackView)
+                obj.fwdEnableControlsCallbackView(enabled);
             end
         end
     end

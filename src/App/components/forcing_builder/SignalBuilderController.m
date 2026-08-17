@@ -5,9 +5,10 @@ classdef SignalBuilderController < handle
     %{
     Example usage:
 
-    >> fig = uifigure("Name", "Forcing Function Builder", "Position", [500, 500, 940, 630]);
-    >> model = SignalBuilderModel;
-    >> view = SignalBuilderView(fig);
+    >> q = SignalQuantity.reference;
+    >> fig = uifigure("Name", q.WindowTitle, "Position", [500, 500, 940, 630]);
+    >> model = SignalBuilderModel(q);
+    >> view = SignalBuilderView(fig, q);
     >> controller = SignalBuilderController(model, view);
     >> uiwait(fig);                   % or call SignalBuilderApp instead
 
@@ -27,7 +28,8 @@ classdef SignalBuilderController < handle
         function obj = SignalBuilderController(model, view)
             obj.Model = model;
             obj.View = view;
-            obj.View.ForceLimit = obj.Model.ForceLimit;
+            obj.View.Quantity = obj.Model.Quantity;
+            obj.View.AmplitudeLimit = obj.Model.AmplitudeLimit;
 
             obj.ModelListeners = addlistener(obj.Model, 'DataUpdated', @(~, ~) obj.handleModelUpdated);
             
@@ -184,9 +186,9 @@ classdef SignalBuilderController < handle
             end
 
             [~, y] = obj.Model.compileFinalSignal();
-            if obj.Model.exceedsForceLimit(y)
+            if obj.Model.exceedsAmplitudeLimit(y)
                 uialert(obj.View.UIFigure, ...
-                    "Can't set the provided forcing function because it exceeds the limits.", ...
+                    obj.Model.Quantity.LimitExceededMessage, ...
                     "Limit Exceeded", "Icon", "error");
                 return;
             end

@@ -7,7 +7,8 @@ classdef SignalBuilderView < handle
     Example usage:
 
     >> fig = uifigure("Position", [500, 500, 940, 630]);
-    >> view = SignalBuilderView(fig);
+    >> view = SignalBuilderView(fig);                          % force [N]
+    >> view = SignalBuilderView(fig, SignalQuantity.reference);
     >> view.swapActivePanel("Sine");
     >> sig = view.getActiveSignal;    % SineSignal from the current field values
     >> view.updatePlot(0:0.001:1, sin(2*pi*(0:0.001:1)));
@@ -27,7 +28,8 @@ classdef SignalBuilderView < handle
         ForcingCanvas
         PanelAdditional
         AdditionalSetup
-        ForceLimit = 3  % [N], copied from SignalBuilderModel
+        Quantity            % SignalQuantity: units, limit, and UI copy
+        AmplitudeLimit = 3  % [Quantity.Unit], copied from SignalBuilderModel
 
         % View Callback functions % these callbacks pass it from overall panel to
         % the SignalBuilderController
@@ -46,7 +48,12 @@ classdef SignalBuilderView < handle
     end
 
     methods
-        function obj = SignalBuilderView(parentContainer)
+        function obj = SignalBuilderView(parentContainer, quantity)
+            if nargin < 2 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+            obj.Quantity = quantity;
+            obj.AmplitudeLimit = quantity.Limit;
     		obj.createComponents(parentContainer)
     		obj.layoutComponents()
     	end
@@ -94,7 +101,7 @@ classdef SignalBuilderView < handle
     		obj.PanelAdditional = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Additional Parameters", "FontWeight", "bold");
 
-            obj.AdditionalSetup = AdditionalPanel(obj.PanelAdditional);
+            obj.AdditionalSetup = AdditionalPanel(obj.PanelAdditional, obj.Quantity);
             
             obj.AdditionalSetup.FinishCallback = @() obj.FinishCallbackView();
             obj.AdditionalSetup.ValueChangedCallback = @() obj.fwdAdditionalChangedCallback();
@@ -120,12 +127,15 @@ classdef SignalBuilderView < handle
         function updatePlot(obj, t, y)
             plot(obj.Plot, t, y);
             hold(obj.Plot, "on");
-            yline(obj.Plot, obj.ForceLimit, "r", "LineWidth", 3);
-            yline(obj.Plot, -obj.ForceLimit, "r", "LineWidth", 3);
+            yline(obj.Plot, obj.AmplitudeLimit, "r", "LineWidth", 3);
+            yline(obj.Plot, -obj.AmplitudeLimit, "r", "LineWidth", 3);
             hold(obj.Plot, "off");
 
+            xlabel(obj.Plot, 'Time (s)');
+            ylabel(obj.Plot, obj.Quantity.PlotYLabel);
+
             yl = ylim(obj.Plot);
-            ylim(obj.Plot, [min(yl(1), -obj.ForceLimit), max(yl(2), obj.ForceLimit)]);
+            ylim(obj.Plot, [min(yl(1), -obj.AmplitudeLimit), max(yl(2), obj.AmplitudeLimit)]);
         end
 
         function swapActivePanel(obj, panelName)
@@ -137,19 +147,20 @@ classdef SignalBuilderView < handle
                 obj.ActiveSetupPanel = [];
             end
 
+            q = obj.Quantity;
             switch panelName
                 case "Custom"
-                    obj.ActiveSetupPanel = CustomPanel(obj.ForcingCanvas);
+                    obj.ActiveSetupPanel = CustomPanel(obj.ForcingCanvas, q);
                 case "Noise"
-                    obj.ActiveSetupPanel = NoisePanel(obj.ForcingCanvas);
+                    obj.ActiveSetupPanel = NoisePanel(obj.ForcingCanvas, q);
                 case "Ramp"
-                    obj.ActiveSetupPanel = RampPanel(obj.ForcingCanvas);
+                    obj.ActiveSetupPanel = RampPanel(obj.ForcingCanvas, q);
                 case "Sine"
-                    obj.ActiveSetupPanel = SinePanel(obj.ForcingCanvas);
+                    obj.ActiveSetupPanel = SinePanel(obj.ForcingCanvas, q);
                 case "Step"
-                    obj.ActiveSetupPanel = StepPanel(obj.ForcingCanvas);
+                    obj.ActiveSetupPanel = StepPanel(obj.ForcingCanvas, q);
                 case "Swept Sine"
-                    obj.ActiveSetupPanel = SweptSinePanel(obj.ForcingCanvas);
+                    obj.ActiveSetupPanel = SweptSinePanel(obj.ForcingCanvas, q);
                 case "Zero Output"
                     obj.ActiveSetupPanel = ZeroOutputPanel(obj.ForcingCanvas);
             end

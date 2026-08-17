@@ -6,6 +6,7 @@ classdef StepPanel < handle
 
     >> fig = uifigure;
     >> panel = StepPanel(fig);
+    >> panel = StepPanel(fig, SignalQuantity.reference);
     >> sig = panel.createSignal;
     >> panel.populate(StepSignal(2, 5, 1));
 
@@ -20,14 +21,18 @@ classdef StepPanel < handle
     end
 
     methods
-        function obj = StepPanel(parentContainer)
+        function obj = StepPanel(parentContainer, quantity)
+            if nargin < 2 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+
             % Construct the programmatic parameters layout grid
             obj.MainLayoutGrid = uigridlayout(parentContainer, [3, 2]);
             obj.MainLayoutGrid.RowHeight = {30, 30, 30};
             obj.MainLayoutGrid.ColumnWidth = {130, '1x'};
 
             % Render standard fields
-            uilabel(obj.MainLayoutGrid, 'Text', 'Magnitude (N):');
+            uilabel(obj.MainLayoutGrid, 'Text', quantity.magnitudeLabel);
             obj.MagEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
             obj.MagEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged;
 

@@ -7,7 +7,7 @@ Waveform math lives in `src/App/components/forcing_builder/signals/`. The UI nev
 Abstract handle class. Every concrete signal must define:
 
 - `Name` — string shown in the Overall list (must match the Available list item and `swapActivePanel` case)
-- `evaluate(obj, t)` — force [N] for each time [s] in `t`
+- `evaluate(obj, t)` — samples of the commanded quantity for each time [s] in `t`. Units come from `SignalQuantity` (N in force mode, mm in reference mode), not from the signal class.
 
 Shared properties:
 
@@ -36,7 +36,7 @@ plot(t, sig.evaluate(t));
 y = A \sin(2\pi f t + \phi) + \text{Offset}, \quad 0 \le t < \text{Duration}
 \]
 
-`InitPhase` is in **degrees** and converted with `deg2rad` inside `evaluate`. Defaults: 1 N, 1 Hz, 0°, 10 s.
+`InitPhase` is in **degrees** and converted with `deg2rad` inside `evaluate`. Defaults: amplitude 1, 1 Hz, 0°, 10 s.
 
 ## StepSignal
 
@@ -89,10 +89,13 @@ Zeros for `Duration` seconds (settle / hold). Offset, if set, applies only insid
 
 ## Units
 
-| Quantity | Unit |
-| --- | --- |
-| Force / amplitude / magnitude / offset | N |
-| Time / duration / dwell | s |
-| Frequency | Hz |
-| Ramp slope | N/s |
-| Phase | deg |
+Waveform classes are unitless. `SignalQuantity` (see [signal-builder.md](signal-builder.md)) chooses how those numbers are labeled and clamped:
+
+| Quantity | Force mode | Reference mode (controller on) |
+| --- | --- | --- |
+| Amplitude / magnitude / offset | N | mm |
+| Ramp slope | N/s | mm/s |
+| Amplitude limit | ±3 N | ±20 mm (travel; confirm hardware) |
+| Time / duration / dwell | s | s |
+| Frequency | Hz | Hz |
+| Phase | deg | deg |

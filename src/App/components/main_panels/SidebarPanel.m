@@ -36,6 +36,7 @@ classdef SidebarPanel < handle
 
         fwdSignalBuilderCallback
         fwdSaveOutputCallback
+        fwdEnableControlsCallback
     end
 
     methods
@@ -212,6 +213,10 @@ classdef SidebarPanel < handle
                 obj.EnableControlsButton.Text = "DISABLED";
                 obj.EnableControlsButton.BackgroundColor = "red";
             end
+
+            if ~isempty(obj.fwdEnableControlsCallback)
+                obj.fwdEnableControlsCallback(logical(state));
+            end
         end
         
         function runSimCallback(obj)
@@ -238,6 +243,14 @@ classdef SidebarPanel < handle
             else
                 obj.SimLamp.Color = [0 1 0];
             end
+        end
+
+        function setSignalBuilderButtonText(obj, text)
+            obj.CreateFcnButton.Text = text;
+        end
+
+        function tf = controlsEnabled(obj)
+            tf = logical(obj.EnableControlsButton.Value);
         end
 
         function setActionButtonsEnabled(obj, tf)

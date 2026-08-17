@@ -13,7 +13,8 @@ function main()
     >> view = AppView(fig);
     >> controller = AppController(model, view);
 
-    Create Forcing Function on the sidebar opens SignalBuilderApp.
+    Create Forcing Function on the sidebar opens SignalBuilderApp (force).
+    Enable Controller switches that button to Create Reference Trajectory (mm).
 
     %}
 

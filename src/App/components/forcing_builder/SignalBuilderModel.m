@@ -5,7 +5,8 @@ classdef SignalBuilderModel < handle
     %{
     Example usage:
 
-    >> model = SignalBuilderModel;
+    >> model = SignalBuilderModel;                  % force [N], limit 3
+    >> model = SignalBuilderModel(SignalQuantity.reference);
     >> model.addSignal(StepSignal(2, 5, 5));
     >> model.RepeatCycles = 3;
     >> [t, y] = model.compileFinalSignal;
@@ -24,14 +25,13 @@ classdef SignalBuilderModel < handle
         Signals = {}
         SampleRate = 1000
 
-        Offset = 0          % [N] DC offset applied to the composite only
+        Quantity            % SignalQuantity: units, limit, and UI copy
+        AmplitudeLimit = 3  % [Quantity.Unit]; from Quantity.Limit
+
+        Offset = 0          % DC offset in Quantity.Unit, applied to the composite only
         DelayBefore = 0     % [s] leading zeros before the composite
         DelayAfter = 0      % [s] trailing zeros after the composite
         RepeatCycles = 1    % copies of (delay + composite + dwell)
-    end
-
-    properties (Constant)
-        ForceLimit = 3  % [N]
     end
     
     properties (Dependent)
@@ -41,6 +41,14 @@ classdef SignalBuilderModel < handle
     end
 
     methods
+        function obj = SignalBuilderModel(quantity)
+            if nargin < 1 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+            obj.Quantity = quantity;
+            obj.AmplitudeLimit = quantity.Limit;
+        end
+
         function addSignal(obj, newSignal)
             if ~isa(newSignal, 'BaseSignal')
                 error('SignalBuilderModel:InvalidType', ...
@@ -140,8 +148,8 @@ classdef SignalBuilderModel < handle
             y = SigObject.evaluate(t);
         end
 
-        function tf = exceedsForceLimit(obj, y)
-            tf = ~isempty(y) && any(abs(y) > obj.ForceLimit);
+        function tf = exceedsAmplitudeLimit(obj, y)
+            tf = ~isempty(y) && any(abs(y) > obj.AmplitudeLimit);
         end
 
         function resetModel(obj)

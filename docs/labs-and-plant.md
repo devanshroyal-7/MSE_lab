@@ -46,7 +46,7 @@ set_param(model_name, 'SimulationCommand', 'start');
 %    cart1_velocity, cart2_velocity
 ```
 
-`SignalBuilderApp` replaces step 1: it writes the same `sim_input` timeseries. `AppModel.startSimulation` is the same `set_param` sequence as step 2.
+`SignalBuilderApp` replaces step 1: it writes the same `sim_input` timeseries (`"Mode","force"` by default; `"reference"` for mm when the controller is on). `AppModel.startSimulation` is the same `set_param` sequence as step 2.
 
 ## Lab 1
 

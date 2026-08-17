@@ -80,7 +80,7 @@ Image files for the sidebar (`sim_start.png`, `sim_stop.png`, `robots5_logo.png`
 
 | Variable | Meaning |
 | --- | --- |
-| `sim_input` | `timeseries` of commanded force [N] vs time [s] |
+| `sim_input` | `timeseries` of commanded force [N] or, with the controller on, reference displacement [mm] vs time [s]. Tagged in `UserData.Quantity` / `UserData.Unit`. |
 | `k_sim` | Simulated extra stiffness [N/m] |
 | `b_sim` | Simulated extra damping [N·s/m] |
 | `T` | Sample time [s] (labs set this; default 0.001) |

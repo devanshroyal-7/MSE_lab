@@ -6,6 +6,7 @@ classdef SinePanel < handle
 
     >> fig = uifigure;
     >> panel = SinePanel(fig);
+    >> panel = SinePanel(fig, SignalQuantity.reference);
     >> sig = panel.createSignal;          % SineSignal from current fields
     >> panel.populate(SineSignal(2, 5, 0, 10));
 
@@ -21,14 +22,18 @@ classdef SinePanel < handle
     end
 
     methods
-        function obj = SinePanel(parentContainer)
+        function obj = SinePanel(parentContainer, quantity)
+            if nargin < 2 || isempty(quantity)
+                quantity = SignalQuantity.force();
+            end
+
             % Construct the programmatic parameters layout grid
             obj.MainLayoutGrid = uigridlayout(parentContainer, [4, 2]);
             obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30};
             obj.MainLayoutGrid.ColumnWidth = {130, '1x'};
 
             % Render standard fields
-            uilabel(obj.MainLayoutGrid, 'Text', 'Amplitude (N):');
+            uilabel(obj.MainLayoutGrid, 'Text', quantity.amplitudeLabel);
             obj.AmpEditField = uieditfield(obj.MainLayoutGrid, 'numeric', 'Value', 1.0);
             obj.AmpEditField.ValueChangedFcn = @(~, ~) obj.parameterChanged();
 
