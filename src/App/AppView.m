@@ -8,7 +8,7 @@ classdef AppView < handle
     >> fig = uifigure("Position", [500, 500, 1900, 900]);
     >> view = AppView(fig);
     >> view.updateReferencePlot(timeseries(y, t));
-    >> view.FreqDomainPanel.AxFRF          % FRF axes
+    >> view.FreqDomainPanel.AxForcingMag   % forcing FFT magnitude axes
 
     %}
 
