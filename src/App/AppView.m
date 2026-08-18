@@ -121,6 +121,15 @@ classdef AppView < handle
             obj.TimeDomainPanel.updateResponsePlot(t, y);
         end
 
+        function updateFftPlots(obj, forcingSpec, responseSpec)
+            obj.FFTPanel.updateForcing(forcingSpec);
+            obj.FFTPanel.updateResponse(responseSpec);
+        end
+
+        function clearFftPlots(obj)
+            obj.FFTPanel.clearPlots();
+        end
+
         function setSimLampRunning(obj, isRunning)
             obj.Sidebar.setSimLampRunning(isRunning);
         end

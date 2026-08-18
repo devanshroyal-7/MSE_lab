@@ -40,6 +40,7 @@ classdef AppController < handle
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
             obj.View.updateResponsePlot([], []);
+            obj.View.clearFftPlots();
 
             try
                 d = uiprogressdlg(figHandle, ...
@@ -80,6 +81,7 @@ classdef AppController < handle
 
                     pause(0.2);
                     obj.plotLoggedResponse();
+                    obj.plotLoggedFft();
                 end
 
             catch ME
@@ -154,6 +156,14 @@ classdef AppController < handle
                 return;
             end
             obj.View.updateResponsePlot(t, y);
+        end
+
+        function plotLoggedFft(obj)
+            [tF, f] = obj.Model.getLoggedForcing();
+            [tX, x] = obj.Model.getLoggedResponse();
+            specF = FftAnalyzer.compute(tF, f);
+            specX = FftAnalyzer.compute(tX, x);
+            obj.View.updateFftPlots(specF, specX);
         end
     end
 end

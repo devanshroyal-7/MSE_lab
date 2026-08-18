@@ -122,6 +122,33 @@ classdef AppModel < handle
             end
         end
 
+        function [t, y] = getLoggedForcing(obj)
+            [t, y] = obj.readWorkspaceNamed('f_input');
+            if ~isempty(y)
+                return;
+            end
+            if isempty(obj.ForcingSignal) || ~isa(obj.ForcingSignal, 'timeseries') ...
+                    || obj.ForcingSignal.Length == 0
+                t = [];
+                y = [];
+                return;
+            end
+            t = obj.ForcingSignal.Time(:);
+            y = squeeze(obj.ForcingSignal.Data);
+            y = y(:);
+            n = min(numel(t), numel(y));
+            t = t(1:n);
+            y = y(1:n);
+        end
+
+        function [t, y] = getLoggedResponse(obj)
+            [t, y] = obj.getLiveCart1Position();
+            if ~isempty(y)
+                return;
+            end
+            [t, y] = obj.readWorkspaceNamed('cart1_position');
+        end
+
         function [t, y] = getLiveCart1Position(obj)
             obj.captureLiveCart1Chunk();
             t = obj.TimeBuffer(:);
@@ -222,25 +249,28 @@ classdef AppModel < handle
             obj.appendLiveChunk(t, y);
         end
 
-        function [t, y] = readWorkspaceCart1(obj)
+        function [t, y] = readWorkspaceNamed(obj, varName)
             t = [];
             y = [];
             try
-                if ~evalin('base', "exist('cart1_position', 'var')")
+                if ~evalin('base', ['exist(''' varName ''', ''var'')'])
                     return;
                 end
-                raw = evalin('base', 'cart1_position');
+                raw = evalin('base', varName);
                 [t, y] = AppModel.signalValuesToXY(raw);
-                if isempty(t) && evalin('base', "exist('rt_time', 'var')")
+                if isempty(t) && ~isempty(y) && evalin('base', "exist('rt_time', 'var')")
                     t = squeeze(evalin('base', 'rt_time'));
                     t = t(:);
-                    y = y(:);
                     n = min(numel(t), numel(y));
                     t = t(1:n);
                     y = y(1:n);
                 end
             catch
             end
+        end
+
+        function [t, y] = readWorkspaceCart1(obj)
+            [t, y] = obj.readWorkspaceNamed('cart1_position');
         end
 
         function id = currentSdiRunId(obj)
