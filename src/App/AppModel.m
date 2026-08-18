@@ -61,6 +61,7 @@ classdef AppModel < handle
             if ~bdIsLoaded(obj.SimulationModelName)
                 load_system(obj.SimulationModelName)
             end
+            obj.ensureExternalMode();
             % MSE_PLANT reads hardware conversion constants from 'base'
             assignin('base', "T", obj.T);
             assignin('base', "r", obj.r);
@@ -96,9 +97,10 @@ classdef AppModel < handle
         function prepareLiveStreaming(obj)
             % SLDRT Run in Kernel uploads Duration-sized buffers. By default
             % only the last buffer is written to the workspace, which is why
-            % the response plot showed a blip at t=end. Write every buffer,
-            % rearm, and apply this AFTER slbuild so the .slx Duration (20480)
-            % does not win.
+            % the response plot showed a blip at t=end. Write every buffer
+            % and rearm. These ExtMode settings are part of TARGET_DATA_MAP,
+            % so they must be applied before slbuild (and re-applied after,
+            % because slbuild restores Duration 20480 from the .slx).
             modelName = char(obj.SimulationModelName);
             if ~bdIsLoaded(modelName)
                 load_system(modelName);
@@ -129,26 +131,19 @@ classdef AppModel < handle
         end
 
         function connectTarget(obj)
-            % Stop any leftover kernel app, rebuild so checksums match, then
-            % connect without starting the run.
+            % External mode and ExtMode buffers first, then rebuild so the
+            % host TARGET_DATA_MAP matches the kernel app, then connect.
             modelName = char(obj.SimulationModelName);
-            % 
-            % if bdIsLoaded(modelName)
-            %     try
-            %         set_param(modelName, 'SimulationCommand', 'stop');
-            %     catch
-            %     end
-            % end
-
-            set_param(modelName, 'SimulationMode', 'external');
-
-            try
-                slbuild(modelName);
-            catch
-                rtwbuild(modelName);
+            if ~bdIsLoaded(modelName)
+                load_system(modelName);
             end
 
+            obj.ensureExternalMode();
+            obj.stopTargetQuietly();
             obj.prepareLiveStreaming();
+            obj.rebuildTarget(modelName);
+            obj.prepareLiveStreaming();
+
             set_param(modelName, 'SimulationCommand', 'connect');
         end
 
@@ -159,6 +154,7 @@ classdef AppModel < handle
             obj.LiveArmed = false;
             obj.StaleSdiRunId = obj.currentSdiRunId();
 
+            obj.ensureExternalMode();
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
             try
                 set_param(char(obj.SimulationModelName), ...
@@ -207,6 +203,29 @@ classdef AppModel < handle
     end
 
     methods (Access = private)
+        function ensureExternalMode(obj)
+            modelName = char(obj.SimulationModelName);
+            if ~bdIsLoaded(modelName)
+                load_system(modelName);
+            end
+            if ~strcmp(get_param(modelName, 'SimulationMode'), 'external')
+                set_param(modelName, 'SimulationMode', 'external');
+            end
+        end
+
+        function stopTargetQuietly(obj)
+            modelName = char(obj.SimulationModelName);
+            if ~bdIsLoaded(modelName)
+                return;
+            end
+            try
+                if ~strcmp(get_param(modelName, 'SimulationStatus'), 'stopped')
+                    set_param(modelName, 'SimulationCommand', 'stop');
+                end
+            catch
+            end
+        end
+
         function rebuildTarget(~, modelName)
             try
                 slbuild(modelName);
