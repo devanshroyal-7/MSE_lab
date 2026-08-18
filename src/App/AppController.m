@@ -41,6 +41,7 @@ classdef AppController < handle
             obj.View.setSimLampRunning(true);
             obj.View.updateResponsePlot([], []);
             obj.View.clearResponseFft();
+            obj.View.clearFrf();
 
             try
                 d = uiprogressdlg(figHandle, ...
@@ -82,6 +83,7 @@ classdef AppController < handle
                     pause(0.2);
                     obj.plotLoggedResponse();
                     obj.plotResponseFft();
+                    obj.plotFrf();
                 end
 
             catch ME
@@ -131,6 +133,7 @@ classdef AppController < handle
             obj.View.clearReferencePlot();
             obj.View.clearForcingFft();
             obj.View.clearResponseFft();
+            obj.View.clearFrf();
         end
 
         function handleSaveOutputCallback(obj)
@@ -173,6 +176,13 @@ classdef AppController < handle
             [t, x] = obj.Model.getLoggedResponse();
             spec = FftAnalyzer.compute(t, x);
             obj.View.updateResponseFft(spec);
+        end
+
+        function plotFrf(obj)
+            [tF, f] = obj.Model.getLoggedForcing();
+            [tX, x] = obj.Model.getLoggedResponse();
+            result = FrfAnalyzer.compute(tF, f, tX, x);
+            obj.View.updateFrf(result);
         end
 
         function spec = fftFromTimeseries(~, ts)

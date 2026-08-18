@@ -7,9 +7,8 @@ classdef FRFPanel < handle
 
     >> fig = uifigure("Position", [100, 100, 800, 700]);
     >> panel = FRFPanel(fig);
-    >> plot(panel.AxMag, freq, magH);
-    >> plot(panel.AxPhase, freq, phaseH);
-    >> plot(panel.AxCoherence, freq, coh);
+    >> result = FrfAnalyzer.compute(tF, f, tX, x);
+    >> panel.update(result);
 
     %}
 
@@ -21,6 +20,10 @@ classdef FRFPanel < handle
         AxPhase
         CoherenceLabel
         AxCoherence
+
+        MagLine
+        PhaseLine
+        CoherenceLine
     end
     methods
         function obj = FRFPanel(parentContainer)
@@ -66,6 +69,35 @@ classdef FRFPanel < handle
             xlabel(obj.AxCoherence, 'Frequency (Hz)');
             ylabel(obj.AxCoherence, 'Coherence');
             ylim(obj.AxCoherence, [0, 1]);
+
+            obj.MagLine = plot(obj.AxMag, NaN, NaN, 'b-', LineWidth=1.5);
+            obj.PhaseLine = plot(obj.AxPhase, NaN, NaN, 'b-', LineWidth=1.5);
+            obj.CoherenceLine = plot(obj.AxCoherence, NaN, NaN, 'b-', LineWidth=1.5);
+        end
+
+        function update(obj, result)
+            if nargin < 2 || isempty(result) || result.n == 0 || isempty(result.freq)
+                obj.clearPlots();
+                return;
+            end
+            set(obj.MagLine, 'XData', result.freq, 'YData', result.mag);
+            set(obj.PhaseLine, 'XData', result.freq, 'YData', result.phase);
+            set(obj.CoherenceLine, 'XData', result.freq, 'YData', result.coherence);
+            xLim = [result.freq(1), result.freq(end)];
+            if xLim(2) <= xLim(1)
+                xLim(2) = xLim(1) + 1;
+            end
+            xlim(obj.AxMag, xLim);
+            xlim(obj.AxPhase, xLim);
+            xlim(obj.AxCoherence, xLim);
+            ylim(obj.AxPhase, [-180, 180]);
+            ylim(obj.AxCoherence, [0, 1]);
+        end
+
+        function clearPlots(obj)
+            set(obj.MagLine, 'XData', NaN, 'YData', NaN);
+            set(obj.PhaseLine, 'XData', NaN, 'YData', NaN);
+            set(obj.CoherenceLine, 'XData', NaN, 'YData', NaN);
         end
     end
 end
