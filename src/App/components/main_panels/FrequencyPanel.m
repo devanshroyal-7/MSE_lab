@@ -28,20 +28,20 @@ classdef FrequencyPanel < handle
     end
     methods
         function obj = FrequencyPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 2]);
+            % Same pattern as TimePanel: labels + axes on one grid, no nested panels.
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [4, 2]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {'1x', '1x'};
+            obj.MainLayoutGrid.RowHeight = {30, '1x', 30, '1x'};
             obj.MainLayoutGrid.RowSpacing = 5;
-            obj.MainLayoutGrid.ColumnSpacing = 10;
 
             [obj.ForcingMagLabel, obj.AxForcingMag] = obj.createPlotCell( ...
-                1, 1, "Forcing FFT Magnitude", "Magnitude (N)");
+                1, 2, 1, "Forcing FFT Magnitude", "Magnitude (N)");
             [obj.ResponseMagLabel, obj.AxResponseMag] = obj.createPlotCell( ...
-                1, 2, "Response FFT Magnitude", "Magnitude (m)");
+                1, 2, 2, "Response FFT Magnitude", "Magnitude (m)");
             [obj.ForcingPhaseLabel, obj.AxForcingPhase] = obj.createPlotCell( ...
-                2, 1, "Forcing FFT Phase", "Phase (deg)");
+                3, 4, 1, "Forcing FFT Phase", "Phase (deg)");
             [obj.ResponsePhaseLabel, obj.AxResponsePhase] = obj.createPlotCell( ...
-                2, 2, "Response FFT Phase", "Phase (deg)");
+                3, 4, 2, "Response FFT Phase", "Phase (deg)");
 
             ylim(obj.AxForcingPhase, [-180, 180]);
             ylim(obj.AxResponsePhase, [-180, 180]);
@@ -49,25 +49,18 @@ classdef FrequencyPanel < handle
     end
 
     methods (Access = private)
-        function [label, ax] = createPlotCell(obj, row, col, titleText, yLabel)
-            cellPanel = uipanel(obj.MainLayoutGrid);
-            cellPanel.Layout.Row = row;
-            cellPanel.Layout.Column = col;
-
-            cellGrid = uigridlayout(cellPanel, [2, 1]);
-            cellGrid.RowHeight = {30, '1x'};
-            cellGrid.RowSpacing = 5;
-            cellGrid.Padding = [5, 5, 5, 5];
-
-            label = uilabel(cellGrid, ...
+        function [label, ax] = createPlotCell(obj, labelRow, axesRow, col, titleText, yLabel)
+            label = uilabel(obj.MainLayoutGrid, ...
                 "Text", titleText, ...
                 "FontWeight", "bold", ...
                 "FontSize", 17, ...
                 "VerticalAlignment", "bottom");
-            label.Layout.Row = 1;
+            label.Layout.Row = labelRow;
+            label.Layout.Column = col;
 
-            ax = uiaxes(cellGrid, "XGrid", "on", "YGrid", "on");
-            ax.Layout.Row = 2;
+            ax = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
+            ax.Layout.Row = axesRow;
+            ax.Layout.Column = col;
             xlabel(ax, 'Frequency (Hz)');
             ylabel(ax, yLabel);
         end
