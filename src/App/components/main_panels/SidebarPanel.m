@@ -1,8 +1,8 @@
 classdef SidebarPanel < handle
     % Right-hand controls: SLDRT start/stop, k_sim / c_sim, runs-to-average,
-    % PID gains, Create Forcing Function, and Save Outputs. Start and Create
-    % Forcing Function forward to AppView; enable toggles only change their
-    % own color.
+    % open/closed loop, PID gains, Create Forcing Function, and Save Outputs.
+    % Start and Create Forcing Function forward to AppView; enable toggles
+    % only change their own color.
     %
     %{
     Example usage:
@@ -48,9 +48,9 @@ classdef SidebarPanel < handle
 
     methods
         function obj = SidebarPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [18, 4]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [19, 4]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x', '1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
 
             %%% Real-time Simulation Controls %%%
             SimControlLabel = uilabel(obj.MainLayoutGrid, ...
@@ -171,63 +171,74 @@ classdef SidebarPanel < handle
             obj.EnableAverageRunsButton.Layout.Column = 2;
             obj.EnableAverageRunsButton.Layout.Row = 2;
 
-            ControlParamPanels = uipanel(obj.MainLayoutGrid, ...
-                "Title", "Control Parameters", ...
+            %%% Control Mode %%%
+            ControlModePanel = uipanel(obj.MainLayoutGrid, ...
+                "Title", "Control Mode", ...
                 "FontWeight", "bold");
-            ControlParamPanels.Layout.Column = [1, 4];
-            ControlParamPanels.Layout.Row = [11, 16];
+            ControlModePanel.Layout.Column = [1, 4];
+            ControlModePanel.Layout.Row = [11, 12];
 
-            ControlParamGrid = uigridlayout(ControlParamPanels, [5, 2]);
+            ControlModeGrid = uigridlayout(ControlModePanel, [1, 1]);
 
-            obj.LoopModeGroup = uibuttongroup(ControlParamGrid, ...
+            obj.LoopModeGroup = uibuttongroup(ControlModeGrid, ...
                 "BorderType", "none", ...
                 "Title", "");
-            obj.LoopModeGroup.Layout.Column = [1, 2];
+            obj.LoopModeGroup.Layout.Column = 1;
             obj.LoopModeGroup.Layout.Row = 1;
 
             obj.OpenLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
                 "Text", " Open Loop", ...
                 "Value", true, ...
                 "FontWeight", "bold", ...
-                "Position", [1, 4, 120, 22]);
+                "Units", "normalized", ...
+                "Position", [0.02, 0.15, 0.46, 0.7]);
 
             obj.ClosedLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
                 "Text", " Closed Loop", ...
                 "FontWeight", "bold", ...
-                "Position", [245, 4, 140, 22]);
+                "Units", "normalized", ...
+                "Position", [0.52, 0.15, 0.46, 0.7]);
+
+            ControlParamPanels = uipanel(obj.MainLayoutGrid, ...
+                "Title", "Control Parameters", ...
+                "FontWeight", "bold");
+            ControlParamPanels.Layout.Column = [1, 4];
+            ControlParamPanels.Layout.Row = [13, 17];
+
+            ControlParamGrid = uigridlayout(ControlParamPanels, [4, 2]);
 
             KpLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_p}$$");
             KpLabel.Interpreter = 'latex';
             KpLabel.Layout.Column = 1;
-            KpLabel.Layout.Row = 2;
+            KpLabel.Layout.Row = 1;
 
             obj.KpEditField = uieditfield(ControlParamGrid, 'numeric');
             obj.KpEditField.Layout.Column = 2;
-            obj.KpEditField.Layout.Row = 2;
+            obj.KpEditField.Layout.Row = 1;
 
             KiLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_i}$$");
             KiLabel.Interpreter = 'latex';
             KiLabel.Layout.Column = 1;
-            KiLabel.Layout.Row = 3;
+            KiLabel.Layout.Row = 2;
 
             obj.KiEditField = uieditfield(ControlParamGrid, 'numeric');
             obj.KiEditField.Layout.Column = 2;
-            obj.KiEditField.Layout.Row = 3;
+            obj.KiEditField.Layout.Row = 2;
 
             KdLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_d}$$");
             KdLabel.Interpreter = 'latex';
             KdLabel.Layout.Column = 1;
-            KdLabel.Layout.Row = 4;
+            KdLabel.Layout.Row = 3;
 
             obj.KdEditField = uieditfield(ControlParamGrid, 'numeric');
             obj.KdEditField.Layout.Column = 2;
-            obj.KdEditField.Layout.Row = 4;
+            obj.KdEditField.Layout.Row = 3;
 
             EnableControlsLabel = uilabel(ControlParamGrid, ...
                 "Text", "Enable Controller", ...
                 "FontWeight", 'bold');
             EnableControlsLabel.Layout.Column = 1;
-            EnableControlsLabel.Layout.Row = 5;
+            EnableControlsLabel.Layout.Row = 4;
 
             obj.EnableControlsButton = uibutton(ControlParamGrid, 'state', ...
                 "Text", "DISABLED", ...
@@ -236,21 +247,21 @@ classdef SidebarPanel < handle
                 "FontSize", 15, ...
                 "ValueChangedFcn", @(src, event) obj.enableControlCallback(event));
             obj.EnableControlsButton.Layout.Column = 2;
-            obj.EnableControlsButton.Layout.Row = 5;
+            obj.EnableControlsButton.Layout.Row = 4;
 
             %%% Forcing Function Button %%%
             obj.CreateFcnButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Create Forcing Function", ...
                 "ButtonPushedFcn", @(src, event) obj.createFcnCallback());
             obj.CreateFcnButton.Layout.Column = [1, 2];
-            obj.CreateFcnButton.Layout.Row = 18;
+            obj.CreateFcnButton.Layout.Row = 19;
 
             %%% Save Output Button %%%
             obj.SaveOutputButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Save Outputs", ...
                 "ButtonPushedFcn", @(src, event) obj.saveOutputCallback());
             obj.SaveOutputButton.Layout.Column = [3, 4];
-            obj.SaveOutputButton.Layout.Row = 18;
+            obj.SaveOutputButton.Layout.Row = 19;
         end
 
         function enableSimParamCallback(obj, event)
