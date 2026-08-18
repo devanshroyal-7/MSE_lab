@@ -19,7 +19,7 @@ classdef AppView < handle
         TabGroup
         SaveButton
         TimeDomainPanel
-        FreqDomainPanel
+        FFTPanel
         Sidebar
 
         % Callback properties
@@ -64,8 +64,8 @@ classdef AppView < handle
             obj.TimeDomainPanel = TimePanel(TimeTab);
 
             % Frequency Domain
-            FrequencyTab = uitab(obj.TabGroup, "Title", "Freuqency");
-            obj.FreqDomainPanel = FrequencyPanel(FrequencyTab);
+            FFTTab = uitab(obj.TabGroup, "Title", "FFT");
+            obj.FFTPanel = FrequencyPanel(FFTTab);
 
             % Controls tab is a placeholder; live sim controls are on SidebarPanel
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
