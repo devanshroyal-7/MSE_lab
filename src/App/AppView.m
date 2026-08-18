@@ -88,7 +88,7 @@ classdef AppView < handle
             obj.Sidebar.fwdRunSignalCallback = @() obj.handleRunSimCallback();
             obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
-            obj.ControlsPanel.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
+            obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
         end
     
         function updateReferencePlot(obj, sim_input)
@@ -114,7 +114,7 @@ classdef AppView < handle
         end
 
         function tf = controlsEnabled(obj)
-            tf = obj.ControlsPanel.controlsEnabled();
+            tf = obj.Sidebar.controlsEnabled();
         end
 
         function updateResponsePlot(obj, t, y)
@@ -127,7 +127,6 @@ classdef AppView < handle
 
         function setAppEnabled(obj, tf)
             obj.Sidebar.setActionButtonsEnabled(tf);
-            obj.ControlsPanel.setActionButtonsEnabled(tf);
         end
     end
 
