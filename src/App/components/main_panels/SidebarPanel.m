@@ -26,6 +26,8 @@ classdef SidebarPanel < handle
         RunsToAverageEditField
         EnableAverageRunsButton
 
+        ControlParamPanel
+        ControlModePanel
         LoopModeGroup
         OpenLoopRadio
         ClosedLoopRadio
@@ -171,39 +173,14 @@ classdef SidebarPanel < handle
             obj.EnableAverageRunsButton.Layout.Column = 2;
             obj.EnableAverageRunsButton.Layout.Row = 2;
 
-            %%% Control Mode %%%
-            ControlModePanel = uipanel(obj.MainLayoutGrid, ...
-                "Title", "Control Mode", ...
-                "FontWeight", "bold");
-            ControlModePanel.Layout.Column = [1, 4];
-            ControlModePanel.Layout.Row = [11, 12];
-
-            ControlModeGrid = uigridlayout(ControlModePanel, [1, 1]);
-
-            obj.LoopModeGroup = uibuttongroup(ControlModeGrid, ...
-                "BorderType", "none", ...
-                "Title", "");
-            obj.LoopModeGroup.Layout.Column = 1;
-            obj.LoopModeGroup.Layout.Row = 1;
-
-            obj.OpenLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
-                "Text", " Open Loop", ...
-                "FontWeight", "bold", ...
-                "Position", [1, 4, 120, 22]);
-
-            obj.ClosedLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
-                "Text", " Closed Loop", ...
-                "Value", true, ...
-                "FontWeight", "bold", ...
-                "Position", [245, 4, 140, 22]);
-
-            ControlParamPanels = uipanel(obj.MainLayoutGrid, ...
+            %%% Control Parameters %%%
+            obj.ControlParamPanel = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Control Parameters", ...
                 "FontWeight", "bold");
-            ControlParamPanels.Layout.Column = [1, 4];
-            ControlParamPanels.Layout.Row = [13, 17];
+            obj.ControlParamPanel.Layout.Column = [1, 4];
+            obj.ControlParamPanel.Layout.Row = [11, 15];
 
-            ControlParamGrid = uigridlayout(ControlParamPanels, [4, 2]);
+            ControlParamGrid = uigridlayout(obj.ControlParamPanel, [4, 2]);
 
             KpLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_p}$$");
             KpLabel.Interpreter = 'latex';
@@ -246,6 +223,34 @@ classdef SidebarPanel < handle
                 "ValueChangedFcn", @(src, event) obj.enableControlCallback(event));
             obj.EnableControlsButton.Layout.Column = 2;
             obj.EnableControlsButton.Layout.Row = 4;
+
+            %%% Control Mode %%%
+            obj.ControlModePanel = uipanel(obj.MainLayoutGrid, ...
+                "Title", "Control Mode", ...
+                "FontWeight", "bold");
+            obj.ControlModePanel.Layout.Column = [1, 4];
+            obj.ControlModePanel.Layout.Row = [16, 17];
+
+            ControlModeGrid = uigridlayout(obj.ControlModePanel, [1, 1]);
+
+            obj.LoopModeGroup = uibuttongroup(ControlModeGrid, ...
+                "BorderType", "none", ...
+                "Title", "");
+            obj.LoopModeGroup.Layout.Column = 1;
+            obj.LoopModeGroup.Layout.Row = 1;
+
+            obj.OpenLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
+                "Text", " Open Loop", ...
+                "FontWeight", "bold", ...
+                "Position", [1, 4, 120, 22]);
+
+            obj.ClosedLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
+                "Text", " Closed Loop", ...
+                "Value", true, ...
+                "FontWeight", "bold", ...
+                "Position", [245, 4, 140, 22]);
+
+            obj.setControlPanelsVisible(false, false);
 
             %%% Forcing Function Button %%%
             obj.CreateFcnButton = uibutton(obj.MainLayoutGrid, ...
@@ -333,6 +338,13 @@ classdef SidebarPanel < handle
             tf = logical(obj.EnableControlsButton.Value);
         end
 
+        function setControlPanelsVisible(obj, showParams, showMode)
+            obj.ControlParamPanel.Visible = obj.onOff(showParams);
+            obj.ControlModePanel.Visible = obj.onOff(showMode);
+            obj.setRowsHeight(11:15, showParams);
+            obj.setRowsHeight(16:17, showMode);
+        end
+
         function setActionButtonsEnabled(obj, tf)
             if tf
                 enableVal = 'on';
@@ -346,6 +358,29 @@ classdef SidebarPanel < handle
             obj.EnableSimParamButton.Enable = enableVal;
             obj.EnableAverageRunsButton.Enable = enableVal;
             obj.EnableControlsButton.Enable = enableVal;
+        end
+    end
+
+    methods (Access = private)
+        function setRowsHeight(obj, rows, isVisible)
+            if isVisible
+                height = 30;
+            else
+                height = 0;
+            end
+            rowHeight = obj.MainLayoutGrid.RowHeight;
+            for r = rows
+                rowHeight{r} = height;
+            end
+            obj.MainLayoutGrid.RowHeight = rowHeight;
+        end
+
+        function val = onOff(~, tf)
+            if tf
+                val = 'on';
+            else
+                val = 'off';
+            end
         end
     end
 end

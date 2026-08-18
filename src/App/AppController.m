@@ -40,6 +40,7 @@ classdef AppController < handle
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
             obj.View.updateResponsePlot([], []);
+            obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
 
             try
@@ -147,18 +148,24 @@ classdef AppController < handle
     methods (Access = private)
         function plotLiveResponse(obj)
             [t, y] = obj.Model.getLiveCart1Position();
-            if isempty(t) || isempty(y)
-                return;
+            if ~isempty(t) && ~isempty(y)
+                obj.View.updateResponsePlot(t, y);
             end
-            obj.View.updateResponsePlot(t, y);
+            [tf, f] = obj.Model.getLiveFInput();
+            if ~isempty(tf) && ~isempty(f)
+                obj.View.updateControlsReferenceInput(tf, f);
+            end
         end
 
         function plotLoggedResponse(obj)
             [t, y] = obj.Model.getLiveCart1Position();
-            if isempty(t) || isempty(y)
-                return;
+            if ~isempty(t) && ~isempty(y)
+                obj.View.updateResponsePlot(t, y);
             end
-            obj.View.updateResponsePlot(t, y);
+            [tf, f] = obj.Model.getLiveFInput();
+            if ~isempty(tf) && ~isempty(f)
+                obj.View.updateControlsReferenceInput(tf, f);
+            end
         end
 
         function plotForcingFft(obj, ts)

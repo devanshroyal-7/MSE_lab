@@ -39,6 +39,8 @@ classdef AppModel < handle
         TimeBuffer      (1,:) double = [];
         PositionBuffer  (1,:) double = [];
         VelocityBuffer  (1,:) double = [];
+        ForcingTimeBuffer (1,:) double = [];
+        ForcingBuffer     (1,:) double = [];
         ForcingSignal           % timeseries object from SignalBuilder
 
         % External-mode upload buffer (samples). At T=0.001 this is 0.05 s.
@@ -47,6 +49,7 @@ classdef AppModel < handle
 
     properties (Access = private)
         LiveArmed (1,1) logical = false
+        LiveArmedForcing (1,1) logical = false
         StaleSdiRunId = []
     end
 
@@ -153,6 +156,12 @@ classdef AppModel < handle
             y = obj.PositionBuffer(:);
         end
 
+        function [t, y] = getLiveFInput(obj)
+            obj.captureLiveFInputChunk();
+            t = obj.ForcingTimeBuffer(:);
+            y = obj.ForcingBuffer(:);
+        end
+
         function connectTarget(obj)
             % External mode and ExtMode buffers first, then rebuild so the
             % host TARGET_DATA_MAP matches the kernel app, then connect.
@@ -174,7 +183,10 @@ classdef AppModel < handle
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
+            obj.ForcingTimeBuffer = [];
+            obj.ForcingBuffer = [];
             obj.LiveArmed = false;
+            obj.LiveArmedForcing = false;
             obj.StaleSdiRunId = obj.currentSdiRunId();
 
             obj.ensureExternalMode();
@@ -260,8 +272,15 @@ classdef AppModel < handle
         function captureLiveCart1Chunk(obj)
             [t, y] = obj.readWorkspaceCart1();
             obj.appendLiveChunk(t, y);
-            [t, y] = obj.readSdiCart1();
+            [t, y] = obj.readSdiNamed('Cart1-Position');
             obj.appendLiveChunk(t, y);
+        end
+
+        function captureLiveFInputChunk(obj)
+            [t, y] = obj.readWorkspaceNamed('f_input');
+            obj.appendLiveForcingChunk(t, y);
+            [t, y] = obj.readSdiNamed('f_input');
+            obj.appendLiveForcingChunk(t, y);
         end
 
         function [t, y] = readWorkspaceNamed(obj, varName)
@@ -300,7 +319,7 @@ classdef AppModel < handle
             end
         end
 
-        function [t, y] = readSdiCart1(obj)
+        function [t, y] = readSdiNamed(obj, nameFragment)
             t = [];
             y = [];
             try
@@ -315,7 +334,7 @@ classdef AppModel < handle
                 sigs = runObj.getAllSignals();
                 for i = 1:numel(sigs)
                     name = char(sigs(i).Name);
-                    if contains(name, 'Cart1-Position', 'IgnoreCase', true)
+                    if contains(name, nameFragment, 'IgnoreCase', true)
                         [t, y] = AppModel.signalValuesToXY(sigs(i).Values);
                         return;
                     end
@@ -325,6 +344,18 @@ classdef AppModel < handle
         end
 
         function appendLiveChunk(obj, t, y)
+            [obj.TimeBuffer, obj.PositionBuffer, obj.LiveArmed] = ...
+                obj.appendLiveSamples(obj.TimeBuffer, obj.PositionBuffer, ...
+                obj.LiveArmed, t, y);
+        end
+
+        function appendLiveForcingChunk(obj, t, y)
+            [obj.ForcingTimeBuffer, obj.ForcingBuffer, obj.LiveArmedForcing] = ...
+                obj.appendLiveSamples(obj.ForcingTimeBuffer, obj.ForcingBuffer, ...
+                obj.LiveArmedForcing, t, y);
+        end
+
+        function [timeBuf, yBuf, armed] = appendLiveSamples(obj, timeBuf, yBuf, armed, t, y)
             if isempty(t) || isempty(y)
                 return;
             end
@@ -338,20 +369,20 @@ classdef AppModel < handle
             % timestamps are near the old StopTime. If we accept that as the
             % start of this run, new samples at t≈0 are dropped until they
             % catch up. Wait for a buffer that starts near t=0.
-            if ~obj.LiveArmed
+            if ~armed
                 maxStart = max(1.0, 4 * obj.LiveBufferSamples * obj.T);
                 if t(1) <= maxStart
-                    obj.LiveArmed = true;
-                    obj.TimeBuffer = t;
-                    obj.PositionBuffer = y;
+                    armed = true;
+                    timeBuf = t;
+                    yBuf = y;
                 end
                 return;
             end
 
-            mask = t > obj.TimeBuffer(end) + (obj.T / 2);
+            mask = t > timeBuf(end) + (obj.T / 2);
             if any(mask)
-                obj.TimeBuffer = [obj.TimeBuffer, t(mask)];
-                obj.PositionBuffer = [obj.PositionBuffer, y(mask)];
+                timeBuf = [timeBuf, t(mask)];
+                yBuf = [yBuf, y(mask)];
             end
         end
     end

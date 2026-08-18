@@ -1,5 +1,6 @@
 classdef AppView < handle
-    % Main MSE app window: title, Time/FFT/FRF/Controls tabs, sidebar.
+    % Main MSE app window: title, Time/FFT/FRF/Controls-Time/Controls-Frequency
+    % tabs, sidebar.
     % Recommended figure size: [500, 500, 1900, 900] (see main.m).
     %
     %{
@@ -10,7 +11,8 @@ classdef AppView < handle
     >> view.updateReferencePlot(timeseries(y, t));
     >> view.FFTPanel.AxForcingMag          % forcing FFT magnitude axes
     >> view.FRFPanel.AxMag                 % FRF magnitude axes
-    >> view.ControlsPanel.AxDisplacement   % controls displacement axes
+    >> view.ControlsPanel.AxDisplacement   % controls-time displacement axes
+    >> view.ControlsFrequencyPanel.AxMag   % controls-frequency Bode magnitude
 
     %}
 
@@ -24,6 +26,9 @@ classdef AppView < handle
         FFTPanel
         FRFPanel
         ControlsPanel
+        ControlsFrequencyPanel
+        ControlsTimeTab
+        ControlsFreqTab
         Sidebar
 
         % Callback properties
@@ -75,9 +80,11 @@ classdef AppView < handle
             frfPanel = FRFPanel(FRFTab);
             obj.FRFPanel = frfPanel;
 
-            ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
-            controlsPanel = ControlsPanel(ControlsTab);
-            obj.ControlsPanel = controlsPanel;
+            obj.ControlsTimeTab = uitab(obj.TabGroup, "Title", "Controls - Time");
+            obj.ControlsPanel = ControlsPanel(obj.ControlsTimeTab);
+
+            obj.ControlsFreqTab = uitab(obj.TabGroup, "Title", "Controls - Frequency");
+            obj.ControlsFrequencyPanel = ControlsFrequencyPanel(obj.ControlsFreqTab);
             
             SidePanel = uipanel(obj.MainLayoutGrid);
             SidePanel.BorderType = 'none';
@@ -89,6 +96,8 @@ classdef AppView < handle
             obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
             obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
+            obj.TabGroup.SelectionChangedFcn = @(src, event) obj.handleTabChanged();
+            obj.handleTabChanged();
         end
     
         function updateReferencePlot(obj, sim_input)
@@ -107,6 +116,7 @@ classdef AppView < handle
 
         function setReferenceQuantity(obj, quantity)
             obj.TimeDomainPanel.setReferenceQuantity(quantity);
+            obj.ControlsPanel.setReferenceQuantity(quantity);
         end
 
         function setSignalBuilderButtonText(obj, text)
@@ -119,6 +129,15 @@ classdef AppView < handle
 
         function updateResponsePlot(obj, t, y)
             obj.TimeDomainPanel.updateResponsePlot(t, y);
+            obj.ControlsPanel.updateDisplacement(t, y);
+        end
+
+        function updateControlsReferenceInput(obj, t, y)
+            obj.ControlsPanel.updateReferenceInput(t, y);
+        end
+
+        function clearControlsTimePlots(obj)
+            obj.ControlsPanel.clearPlots();
         end
 
         function updateFftPlots(obj, forcingSpec, responseSpec)
@@ -179,6 +198,17 @@ classdef AppView < handle
             if ~isempty(obj.fwdEnableControlsCallbackView)
                 obj.fwdEnableControlsCallbackView(enabled);
             end
+        end
+
+        function handleTabChanged(obj)
+            if isempty(obj.Sidebar)
+                return;
+            end
+            selected = obj.TabGroup.SelectedTab;
+            onControlsTime = ~isempty(obj.ControlsTimeTab) && isequal(selected, obj.ControlsTimeTab);
+            onControlsFreq = ~isempty(obj.ControlsFreqTab) && isequal(selected, obj.ControlsFreqTab);
+            obj.Sidebar.setControlPanelsVisible( ...
+                onControlsTime || onControlsFreq, onControlsFreq);
         end
     end
 end
