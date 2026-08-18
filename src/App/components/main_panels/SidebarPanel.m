@@ -1,7 +1,7 @@
 classdef SidebarPanel < handle
-    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, PID gains,
+    % Right-hand controls: SLDRT start/stop, k_sim / c_sim,
     % Create Forcing Function, and Save Outputs. Start and Create Forcing
-    % Function forward to AppView; enable toggles only change their own color.
+    % Function forward to AppView; the sim-param enable toggle only changes color.
     %
     %{
     Example usage:
@@ -22,11 +22,6 @@ classdef SidebarPanel < handle
         BSimEditField
         EnableSimParamButton
 
-        KpEditField
-        KiEditField
-        KdEditField
-        EnableControlsButton
-
         CreateFcnButton
         SaveOutputButton
         SimLamp
@@ -36,14 +31,13 @@ classdef SidebarPanel < handle
 
         fwdSignalBuilderCallback
         fwdSaveOutputCallback
-        fwdEnableControlsCallback
     end
 
     methods
         function obj = SidebarPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [14, 4]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [9, 4]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x', '1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, '1x', 30};
 
             %%% Real-time Simulation Controls %%%
             SimControlLabel = uilabel(obj.MainLayoutGrid, ...
@@ -128,69 +122,19 @@ classdef SidebarPanel < handle
             obj.EnableSimParamButton.Layout.Column = 2;
             obj.EnableSimParamButton.Layout.Row = 3;
 
-            ControlParamPanels = uipanel(obj.MainLayoutGrid, ...
-                "Title", "Control Parameters", ...
-                "FontWeight", "bold");
-            ControlParamPanels.Layout.Column = [1, 4];
-            ControlParamPanels.Layout.Row = [8, 12];
-
-            ControlParamGrid = uigridlayout(ControlParamPanels, [4, 2]);
-
-            KpLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_p}$$");
-            KpLabel.Interpreter = 'latex';
-            KpLabel.Layout.Column = 1;
-            KpLabel.Layout.Row = 1;
-
-            obj.KpEditField = uieditfield(ControlParamGrid, 'numeric');
-            obj.KpEditField.Layout.Column = 2;
-            obj.KpEditField.Layout.Row = 1;
-
-            KiLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_i}$$");
-            KiLabel.Interpreter = 'latex';
-            KiLabel.Layout.Column = 1;
-            KiLabel.Layout.Row = 2;
-
-            obj.KiEditField = uieditfield(ControlParamGrid, 'numeric');
-            obj.KiEditField.Layout.Column = 2;
-            obj.KiEditField.Layout.Row = 2;
-
-            KdLabel = uilabel(ControlParamGrid, "Text", "$$\mathbf{K_d}$$");
-            KdLabel.Interpreter = 'latex';
-            KdLabel.Layout.Column = 1;
-            KdLabel.Layout.Row = 3;
-
-            obj.KdEditField = uieditfield(ControlParamGrid, 'numeric');
-            obj.KdEditField.Layout.Column = 2;
-            obj.KdEditField.Layout.Row = 3;
-
-            EnableControlsLabel = uilabel(ControlParamGrid, ...
-                "Text", "Enable Controller", ...
-                "FontWeight", 'bold');
-            EnableControlsLabel.Layout.Column = 1;
-            EnableControlsLabel.Layout.Row = 4;
-
-            obj.EnableControlsButton = uibutton(ControlParamGrid, 'state', ...
-                "Text", "DISABLED", ...
-                "BackgroundColor","red", ...
-                "FontWeight", 'bold', ...
-                "FontSize", 15, ...
-                "ValueChangedFcn", @(src, event) obj.enableControlCallback(event));
-            obj.EnableControlsButton.Layout.Column = 2;
-            obj.EnableControlsButton.Layout.Row = 4;
-
             %%% Forcing Function Button %%%
             obj.CreateFcnButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Create Forcing Function", ...
                 "ButtonPushedFcn", @(src, event) obj.createFcnCallback());
             obj.CreateFcnButton.Layout.Column = [1, 2];
-            obj.CreateFcnButton.Layout.Row = 14;
+            obj.CreateFcnButton.Layout.Row = 9;
 
             %%% Save Output Button %%%
             obj.SaveOutputButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Save Outputs", ...
                 "ButtonPushedFcn", @(src, event) obj.saveOutputCallback());
             obj.SaveOutputButton.Layout.Column = [3, 4];
-            obj.SaveOutputButton.Layout.Row = 14;
+            obj.SaveOutputButton.Layout.Row = 9;
         end
 
         function enableSimParamCallback(obj, event)
@@ -204,21 +148,6 @@ classdef SidebarPanel < handle
             end
         end
 
-        function enableControlCallback(obj, event)
-            state = event.Value;
-            if state
-                obj.EnableControlsButton.Text = "ENABLED";
-                obj.EnableControlsButton.BackgroundColor = "green";
-            else
-                obj.EnableControlsButton.Text = "DISABLED";
-                obj.EnableControlsButton.BackgroundColor = "red";
-            end
-
-            if ~isempty(obj.fwdEnableControlsCallback)
-                obj.fwdEnableControlsCallback(logical(state));
-            end
-        end
-        
         function runSimCallback(obj)
             if ~isempty(obj.fwdRunSignalCallback)
                 obj.fwdRunSignalCallback();
@@ -249,10 +178,6 @@ classdef SidebarPanel < handle
             obj.CreateFcnButton.Text = text;
         end
 
-        function tf = controlsEnabled(obj)
-            tf = logical(obj.EnableControlsButton.Value);
-        end
-
         function setActionButtonsEnabled(obj, tf)
             if tf
                 enableVal = 'on';
@@ -264,7 +189,6 @@ classdef SidebarPanel < handle
             obj.CreateFcnButton.Enable = enableVal;
             obj.SaveOutputButton.Enable = enableVal;
             obj.EnableSimParamButton.Enable = enableVal;
-            obj.EnableControlsButton.Enable = enableVal;
         end
     end
 end

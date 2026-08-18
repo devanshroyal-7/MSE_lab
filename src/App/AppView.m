@@ -10,6 +10,7 @@ classdef AppView < handle
     >> view.updateReferencePlot(timeseries(y, t));
     >> view.FFTPanel.AxForcingMag          % forcing FFT magnitude axes
     >> view.FRFPanel.AxMag                 % FRF magnitude axes
+    >> view.ControlsPanel.AxDisplacement   % controls displacement axes
 
     %}
 
@@ -22,6 +23,7 @@ classdef AppView < handle
         TimeDomainPanel
         FFTPanel
         FRFPanel
+        ControlsPanel
         Sidebar
 
         % Callback properties
@@ -73,8 +75,9 @@ classdef AppView < handle
             frfPanel = FRFPanel(FRFTab);
             obj.FRFPanel = frfPanel;
 
-            % Controls tab is a placeholder; live sim controls are on SidebarPanel
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
+            controlsPanel = ControlsPanel(ControlsTab);
+            obj.ControlsPanel = controlsPanel;
             
             SidePanel = uipanel(obj.MainLayoutGrid);
             SidePanel.BorderType = 'none';
@@ -85,7 +88,7 @@ classdef AppView < handle
             obj.Sidebar.fwdRunSignalCallback = @() obj.handleRunSimCallback();
             obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
-            obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
+            obj.ControlsPanel.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
         end
     
         function updateReferencePlot(obj, sim_input)
@@ -111,7 +114,7 @@ classdef AppView < handle
         end
 
         function tf = controlsEnabled(obj)
-            tf = obj.Sidebar.controlsEnabled();
+            tf = obj.ControlsPanel.controlsEnabled();
         end
 
         function updateResponsePlot(obj, t, y)
@@ -124,6 +127,7 @@ classdef AppView < handle
 
         function setAppEnabled(obj, tf)
             obj.Sidebar.setActionButtonsEnabled(tf);
+            obj.ControlsPanel.setActionButtonsEnabled(tf);
         end
     end
 
