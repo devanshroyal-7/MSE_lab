@@ -1,7 +1,8 @@
 classdef SidebarPanel < handle
-    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, PID gains,
-    % Create Forcing Function, and Save Outputs. Start and Create Forcing
-    % Function forward to AppView; enable toggles only change their own color.
+    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, runs-to-average,
+    % PID gains, Create Forcing Function, and Save Outputs. Start and Create
+    % Forcing Function forward to AppView; enable toggles only change their
+    % own color.
     %
     %{
     Example usage:
@@ -21,6 +22,9 @@ classdef SidebarPanel < handle
         KSimEditField
         BSimEditField
         EnableSimParamButton
+
+        RunsToAverageEditField
+        EnableAverageRunsButton
 
         LoopModeGroup
         OpenLoopRadio
@@ -44,9 +48,9 @@ classdef SidebarPanel < handle
 
     methods
         function obj = SidebarPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [15, 4]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [18, 4]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x', '1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
 
             %%% Real-time Simulation Controls %%%
             SimControlLabel = uilabel(obj.MainLayoutGrid, ...
@@ -131,11 +135,47 @@ classdef SidebarPanel < handle
             obj.EnableSimParamButton.Layout.Column = 2;
             obj.EnableSimParamButton.Layout.Row = 3;
 
+            %%% Average Runs %%%
+            AverageRunsPanel = uipanel(obj.MainLayoutGrid, ...
+                "Title", "Average Runs", ...
+                "FontWeight", "bold");
+            AverageRunsPanel.Layout.Column = [1, 4];
+            AverageRunsPanel.Layout.Row = [8, 10];
+
+            AverageRunsGrid = uigridlayout(AverageRunsPanel, [2, 2]);
+
+            RunsToAverageLabel = uilabel(AverageRunsGrid, ...
+                "Text", "Runs to Average");
+            RunsToAverageLabel.Layout.Column = 1;
+            RunsToAverageLabel.Layout.Row = 1;
+
+            obj.RunsToAverageEditField = uieditfield(AverageRunsGrid, 'numeric');
+            obj.RunsToAverageEditField.Limits = [1, Inf];
+            obj.RunsToAverageEditField.RoundFractionalValues = true;
+            obj.RunsToAverageEditField.Value = 1;
+            obj.RunsToAverageEditField.Layout.Column = 2;
+            obj.RunsToAverageEditField.Layout.Row = 1;
+
+            EnableAverageRunsLabel = uilabel(AverageRunsGrid, ...
+                "Text", "Enable Average Runs", ...
+                "FontWeight", "bold");
+            EnableAverageRunsLabel.Layout.Column = 1;
+            EnableAverageRunsLabel.Layout.Row = 2;
+
+            obj.EnableAverageRunsButton = uibutton(AverageRunsGrid, 'state', ...
+                "Text", "DISABLED", ...
+                "BackgroundColor","red", ...
+                "FontWeight", 'bold', ...
+                "FontSize", 15, ...
+                "ValueChangedFcn", @(src, event) obj.enableAverageRunsCallback(event));
+            obj.EnableAverageRunsButton.Layout.Column = 2;
+            obj.EnableAverageRunsButton.Layout.Row = 2;
+
             ControlParamPanels = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Control Parameters", ...
                 "FontWeight", "bold");
             ControlParamPanels.Layout.Column = [1, 4];
-            ControlParamPanels.Layout.Row = [8, 13];
+            ControlParamPanels.Layout.Row = [11, 16];
 
             ControlParamGrid = uigridlayout(ControlParamPanels, [5, 2]);
 
@@ -203,14 +243,14 @@ classdef SidebarPanel < handle
                 "Text","Create Forcing Function", ...
                 "ButtonPushedFcn", @(src, event) obj.createFcnCallback());
             obj.CreateFcnButton.Layout.Column = [1, 2];
-            obj.CreateFcnButton.Layout.Row = 15;
+            obj.CreateFcnButton.Layout.Row = 18;
 
             %%% Save Output Button %%%
             obj.SaveOutputButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Save Outputs", ...
                 "ButtonPushedFcn", @(src, event) obj.saveOutputCallback());
             obj.SaveOutputButton.Layout.Column = [3, 4];
-            obj.SaveOutputButton.Layout.Row = 15;
+            obj.SaveOutputButton.Layout.Row = 18;
         end
 
         function enableSimParamCallback(obj, event)
@@ -221,6 +261,17 @@ classdef SidebarPanel < handle
             else
                 obj.EnableSimParamButton.Text = "DISABLED";
                 obj.EnableSimParamButton.BackgroundColor = "red";
+            end
+        end
+
+        function enableAverageRunsCallback(obj, event)
+            state = event.Value;
+            if state
+                obj.EnableAverageRunsButton.Text = "ENABLED";
+                obj.EnableAverageRunsButton.BackgroundColor = "green";
+            else
+                obj.EnableAverageRunsButton.Text = "DISABLED";
+                obj.EnableAverageRunsButton.BackgroundColor = "red";
             end
         end
 
@@ -284,6 +335,7 @@ classdef SidebarPanel < handle
             obj.CreateFcnButton.Enable = enableVal;
             obj.SaveOutputButton.Enable = enableVal;
             obj.EnableSimParamButton.Enable = enableVal;
+            obj.EnableAverageRunsButton.Enable = enableVal;
             obj.EnableControlsButton.Enable = enableVal;
         end
     end
