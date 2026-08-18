@@ -1,7 +1,7 @@
 classdef FrequencyPanel < handle
     % Frequency-domain tab: 2x2 FFT grid (forcing | response) x (magnitude / phase).
     % Axes are empty until the controller writes spectra after a run.
-    % FRF lives on a separate tab (not built here).
+    % FRF lives on FRFPanel.
     %
     %{
     Example usage:

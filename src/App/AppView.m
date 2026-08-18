@@ -1,5 +1,5 @@
 classdef AppView < handle
-    % Main MSE app window: title, Time/Frequency/Controls tabs, sidebar.
+    % Main MSE app window: title, Time/FFT/FRF/Controls tabs, sidebar.
     % Recommended figure size: [500, 500, 1900, 900] (see main.m).
     %
     %{
@@ -8,7 +8,8 @@ classdef AppView < handle
     >> fig = uifigure("Position", [500, 500, 1900, 900]);
     >> view = AppView(fig);
     >> view.updateReferencePlot(timeseries(y, t));
-    >> view.FreqDomainPanel.AxForcingMag   % forcing FFT magnitude axes
+    >> view.FFTPanel.AxForcingMag          % forcing FFT magnitude axes
+    >> view.FRFPanel.AxMag                 % FRF magnitude axes
 
     %}
 
@@ -20,6 +21,7 @@ classdef AppView < handle
         SaveButton
         TimeDomainPanel
         FFTPanel
+        FRFPanel
         Sidebar
 
         % Callback properties
@@ -66,6 +68,10 @@ classdef AppView < handle
             % Frequency Domain
             FFTTab = uitab(obj.TabGroup, "Title", "FFT");
             obj.FFTPanel = FrequencyPanel(FFTTab);
+
+            FRFTab = uitab(obj.TabGroup, "Title", "FRF");
+            frfPanel = FRFPanel(FRFTab);
+            obj.FRFPanel = frfPanel;
 
             % Controls tab is a placeholder; live sim controls are on SidebarPanel
             ControlsTab = uitab(obj.TabGroup, "Title", "Controls");
