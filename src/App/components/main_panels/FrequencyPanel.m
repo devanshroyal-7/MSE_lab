@@ -30,6 +30,7 @@ classdef FrequencyPanel < handle
         ForcingPhaseLine
         ResponseMagLine
         ResponsePhaseLine
+        FreqXLim (1,2) double = [0, 50]
     end
     methods
         function obj = FrequencyPanel(parentContainer)
@@ -60,11 +61,14 @@ classdef FrequencyPanel < handle
         function updateForcing(obj, spec)
             obj.setSpectrumLines(obj.AxForcingMag, obj.ForcingMagLine, ...
                 obj.AxForcingPhase, obj.ForcingPhaseLine, spec);
+            obj.FreqXLim = FftAnalyzer.displayXLim(spec);
+            obj.applyFreqXLim();
         end
 
         function updateResponse(obj, spec)
             obj.setSpectrumLines(obj.AxResponseMag, obj.ResponseMagLine, ...
                 obj.AxResponsePhase, obj.ResponsePhaseLine, spec);
+            obj.applyFreqXLim();
         end
 
         function clearPlots(obj)
@@ -99,13 +103,15 @@ classdef FrequencyPanel < handle
             end
             set(magLine, 'XData', spec.freq, 'YData', spec.mag);
             set(phaseLine, 'XData', spec.freq, 'YData', spec.phase);
-            xLim = [spec.freq(1), spec.freq(end)];
-            if xLim(2) <= xLim(1)
-                xLim(2) = xLim(1) + 1;
-            end
-            xlim(magAx, xLim);
-            xlim(phaseAx, xLim);
             ylim(phaseAx, [-180, 180]);
+        end
+
+        function applyFreqXLim(obj)
+            xLim = obj.FreqXLim;
+            xlim(obj.AxForcingMag, xLim);
+            xlim(obj.AxForcingPhase, xLim);
+            xlim(obj.AxResponseMag, xLim);
+            xlim(obj.AxResponsePhase, xLim);
         end
     end
 end

@@ -124,9 +124,53 @@ classdef FftAnalyzer
                 "fs", NaN, ...
                 "n", 0);
         end
+
+        function xLim = displayXLim(spec)
+            % [0, fHi] covering bins with significant AC energy, plus padding.
+            % Used so FFT/FRF axes track the excitation instead of Nyquist.
+            if nargin < 1 || isempty(spec) || ~isfield(spec, 'freq') || isempty(spec.freq)
+                xLim = [0, 50];
+                return;
+            end
+            xLim = FftAnalyzer.displayXLimFromMag(spec.freq, spec.mag);
+        end
     end
 
     methods (Static, Access = private)
+        function xLim = displayXLimFromMag(freq, mag)
+            freq = freq(:);
+            mag = abs(mag(:));
+            n = min(numel(freq), numel(mag));
+            freq = freq(1:n);
+            mag = mag(1:n);
+            mag(~isfinite(mag)) = 0;
+
+            nyquist = freq(end);
+            if ~(nyquist > 0)
+                xLim = [0, 50];
+                return;
+            end
+
+            ac = freq > 0;
+            peak = 0;
+            if any(ac)
+                peak = max(mag(ac));
+            end
+            if ~(peak > 0)
+                xLim = [0, min(50, nyquist)];
+                return;
+            end
+
+            mask = ac & mag >= 1e-3 * peak;
+            if ~any(mask)
+                fHi = min(50, nyquist);
+            else
+                fHi = max(freq(mask));
+            end
+            fHi = min(nyquist, max(fHi * 1.25, fHi + 2));
+            xLim = [0, fHi];
+        end
+
         function phase = wrapPhaseDeg(phase)
             phase = mod(phase + 180, 360) - 180;
         end

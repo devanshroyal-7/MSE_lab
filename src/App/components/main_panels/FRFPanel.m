@@ -90,9 +90,11 @@ classdef FRFPanel < handle
             set(obj.MagLine, 'XData', result.freq, 'YData', mag);
             set(obj.PhaseLine, 'XData', result.freq, 'YData', phase);
             set(obj.CoherenceLine, 'XData', result.freq, 'YData', coh);
-            xLim = [result.freq(1), result.freq(end)];
-            if xLim(2) <= xLim(1)
-                xLim(2) = xLim(1) + 1;
+
+            if isfield(result, 'xLim') && numel(result.xLim) == 2 && result.xLim(2) > result.xLim(1)
+                xLim = result.xLim;
+            else
+                xLim = FftAnalyzer.displayXLim(struct('freq', result.freq, 'mag', mag));
             end
             xlim(obj.AxMag, xLim);
             xlim(obj.AxPhase, xLim);

@@ -51,6 +51,7 @@ classdef FrfAnalyzer
             result.phase = FrfAnalyzer.wrapPhaseDeg(rad2deg(angle(H)));
             result.coherence = FrfAnalyzer.welchCoherence(t, u, y, result.freq);
             result.coherence(isnan(H)) = NaN;
+            result.xLim = FftAnalyzer.displayXLim(specF);
         end
 
         function result = emptyResult()
@@ -61,7 +62,8 @@ classdef FrfAnalyzer
                 "phase", zeros(0, 1), ...
                 "coherence", zeros(0, 1), ...
                 "fs", NaN, ...
-                "n", 0);
+                "n", 0, ...
+                "xLim", [0, 50]);
         end
     end
 
