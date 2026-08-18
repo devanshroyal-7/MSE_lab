@@ -126,8 +126,24 @@ classdef AppView < handle
             obj.FFTPanel.updateResponse(responseSpec);
         end
 
+        function updateForcingFft(obj, spec)
+            obj.FFTPanel.updateForcing(spec);
+        end
+
+        function updateResponseFft(obj, spec)
+            obj.FFTPanel.updateResponse(spec);
+        end
+
         function clearFftPlots(obj)
             obj.FFTPanel.clearPlots();
+        end
+
+        function clearForcingFft(obj)
+            obj.FFTPanel.updateForcing(FftAnalyzer.emptySpectrum());
+        end
+
+        function clearResponseFft(obj)
+            obj.FFTPanel.updateResponse(FftAnalyzer.emptySpectrum());
         end
 
         function setSimLampRunning(obj, isRunning)

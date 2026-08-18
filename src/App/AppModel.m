@@ -123,10 +123,6 @@ classdef AppModel < handle
         end
 
         function [t, y] = getLoggedForcing(obj)
-            [t, y] = obj.readWorkspaceNamed('f_input');
-            if ~isempty(y)
-                return;
-            end
             if isempty(obj.ForcingSignal) || ~isa(obj.ForcingSignal, 'timeseries') ...
                     || obj.ForcingSignal.Length == 0
                 t = [];
