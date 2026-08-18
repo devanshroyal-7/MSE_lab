@@ -40,6 +40,7 @@ classdef AppController < handle
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
             obj.View.updateResponsePlot([], []);
+            obj.View.clearResponseFft();
 
             try
                 d = uiprogressdlg(figHandle, ...
@@ -80,6 +81,7 @@ classdef AppController < handle
 
                     pause(0.2);
                     obj.plotLoggedResponse();
+                    obj.plotResponseFft();
                 end
 
             catch ME
@@ -107,6 +109,7 @@ classdef AppController < handle
                 stopTime = sim_input.Time(end);
 
                 obj.View.updateReferencePlot(sim_input)
+                obj.plotForcingFft(sim_input)
 
                 fprintf('Signal successfully set (%s). Duration %.2f seconds.\n', ...
                     mode, stopTime);
@@ -126,6 +129,8 @@ classdef AppController < handle
             obj.View.setReferenceQuantity(quantity);
             obj.Model.clearForcingInput();
             obj.View.clearReferencePlot();
+            obj.View.clearForcingFft();
+            obj.View.clearResponseFft();
         end
 
         function handleSaveOutputCallback(obj)
@@ -154,6 +159,31 @@ classdef AppController < handle
                 return;
             end
             obj.View.updateResponsePlot(t, y);
+        end
+
+        function plotForcingFft(obj, ts)
+            if nargin < 2
+                ts = obj.Model.ForcingSignal;
+            end
+            spec = obj.fftFromTimeseries(ts);
+            obj.View.updateForcingFft(spec);
+        end
+
+        function plotResponseFft(obj)
+            [t, x] = obj.Model.getLoggedResponse();
+            spec = FftAnalyzer.compute(t, x);
+            obj.View.updateResponseFft(spec);
+        end
+
+        function spec = fftFromTimeseries(~, ts)
+            if isempty(ts) || ~isa(ts, 'timeseries') || ts.Length == 0
+                spec = FftAnalyzer.emptySpectrum();
+                return;
+            end
+            t = ts.Time(:);
+            y = squeeze(ts.Data);
+            y = y(:);
+            spec = FftAnalyzer.compute(t, y);
         end
     end
 end

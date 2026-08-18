@@ -121,6 +121,31 @@ classdef AppView < handle
             obj.TimeDomainPanel.updateResponsePlot(t, y);
         end
 
+        function updateFftPlots(obj, forcingSpec, responseSpec)
+            obj.FFTPanel.updateForcing(forcingSpec);
+            obj.FFTPanel.updateResponse(responseSpec);
+        end
+
+        function updateForcingFft(obj, spec)
+            obj.FFTPanel.updateForcing(spec);
+        end
+
+        function updateResponseFft(obj, spec)
+            obj.FFTPanel.updateResponse(spec);
+        end
+
+        function clearFftPlots(obj)
+            obj.FFTPanel.clearPlots();
+        end
+
+        function clearForcingFft(obj)
+            obj.FFTPanel.updateForcing(FftAnalyzer.emptySpectrum());
+        end
+
+        function clearResponseFft(obj)
+            obj.FFTPanel.updateResponse(FftAnalyzer.emptySpectrum());
+        end
+
         function setSimLampRunning(obj, isRunning)
             obj.Sidebar.setSimLampRunning(isRunning);
         end
