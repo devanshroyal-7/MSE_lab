@@ -27,9 +27,10 @@ classdef AppModel < handle
     end
 
     properties (Access = public)
-        % Simulation parameters
+        % Simulation parameters (sidebar values; plant sees 0 until enabled)
         k_sim       (1,1) double = 0;   % simulated stiffness   [N/m]
         b_sim       (1,1) double = 0;   % simulated damping     [Ns/m]
+        SimParamsEnabled (1,1) logical = false;
 
         % Simulation control and configuration
         SimulationModelName (1,1) string = "MSE_PLANT";
@@ -70,6 +71,31 @@ classdef AppModel < handle
             assignin('base', "r", obj.r);
             assignin('base', "Kt", obj.Kt);
             assignin('base', "motor_eff", obj.motor_eff);
+            obj.applySimParamsToWorkspace();
+        end
+
+        function setSimulatedParameters(obj, k, b, enabled)
+            obj.k_sim = k;
+            obj.b_sim = b;
+            obj.SimParamsEnabled = logical(enabled);
+        end
+
+        function applySimParamsToWorkspace(obj)
+            % MSE_PLANT Gain blocks read k_sim / b_sim from 'base'. Disabled
+            % sidebar params still write 0 so a leftover value cannot leak in.
+            [k, b] = obj.effectiveSimParams();
+            assignin('base', 'k_sim', k);
+            assignin('base', 'b_sim', b);
+        end
+
+        function [k, b] = effectiveSimParams(obj)
+            if obj.SimParamsEnabled
+                k = obj.k_sim;
+                b = obj.b_sim;
+            else
+                k = 0;
+                b = 0;
+            end
         end
 
         function setForcingInput(obj, tsInput)
@@ -78,8 +104,7 @@ classdef AppModel < handle
 
             % MSE_PLANT From Workspace / Gain blocks read these from 'base'
             assignin('base', 'sim_input', tsInput);
-            assignin('base', 'k_sim', obj.k_sim);
-            assignin('base', 'b_sim', obj.b_sim);
+            obj.applySimParamsToWorkspace();
 
             set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
 
@@ -170,6 +195,7 @@ classdef AppModel < handle
                 load_system(modelName);
             end
 
+            obj.applySimParamsToWorkspace();
             obj.ensureExternalMode();
             obj.stopTargetQuietly();
             obj.prepareLiveStreaming();
@@ -180,6 +206,7 @@ classdef AppModel < handle
         end
 
         function startSimulation(obj)
+            obj.applySimParamsToWorkspace();
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];

@@ -1,8 +1,8 @@
 classdef SidebarPanel < handle
     % Right-hand controls: SLDRT start/stop, k_sim / c_sim, runs-to-average,
     % open/closed loop, PID gains, Create Forcing Function, and Save Outputs.
-    % Start and Create Forcing Function forward to AppView; enable toggles
-    % only change their own color.
+    % Start and Create Forcing Function forward to AppView; k/c and the
+    % simulated-parameter enable forward into AppModel.
     %
     %{
     Example usage:
@@ -46,6 +46,7 @@ classdef SidebarPanel < handle
         fwdSignalBuilderCallback
         fwdSaveOutputCallback
         fwdEnableControlsCallback
+        fwdSimParamsChangedCallback
     end
 
     methods
@@ -109,6 +110,8 @@ classdef SidebarPanel < handle
             KSimLabel.Layout.Row = 1;
 
             obj.KSimEditField = uieditfield(SimParamGrid, 'numeric');
+            obj.KSimEditField.Value = 0;
+            obj.KSimEditField.ValueChangedFcn = @(~, ~) obj.simParamsChanged();
             obj.KSimEditField.Layout.Column = 2;
             obj.KSimEditField.Layout.Row = 1;
 
@@ -119,6 +122,8 @@ classdef SidebarPanel < handle
             BSimLabel.Layout.Row = 2;
 
             obj.BSimEditField = uieditfield(SimParamGrid, 'numeric');
+            obj.BSimEditField.Value = 0;
+            obj.BSimEditField.ValueChangedFcn = @(~, ~) obj.simParamsChanged();
             obj.BSimEditField.Layout.Column = 2;
             obj.BSimEditField.Layout.Row = 2;
 
@@ -275,6 +280,16 @@ classdef SidebarPanel < handle
             else
                 obj.EnableSimParamButton.Text = "DISABLED";
                 obj.EnableSimParamButton.BackgroundColor = "red";
+            end
+            obj.simParamsChanged();
+        end
+
+        function simParamsChanged(obj)
+            if ~isempty(obj.fwdSimParamsChangedCallback)
+                obj.fwdSimParamsChangedCallback( ...
+                    obj.KSimEditField.Value, ...
+                    obj.BSimEditField.Value, ...
+                    logical(obj.EnableSimParamButton.Value));
             end
         end
 

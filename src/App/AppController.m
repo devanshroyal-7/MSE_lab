@@ -30,6 +30,7 @@ classdef AppController < handle
             obj.View.fwdSignalBuilderCallbackView = @() obj.handleSignalBuilderCallback();
             obj.View.fwdSaveOutputCallbackView = @() obj.handleSaveOutputCallback();
             obj.View.fwdEnableControlsCallbackView = @(enabled) obj.handleEnableControlsCallback(enabled);
+            obj.View.fwdSimParamsChangedCallbackView = @(k, b, enabled) obj.handleSimParamsChangedCallback(k, b, enabled);
         end
 
         function handleRunSimCallback(obj)
@@ -132,6 +133,10 @@ classdef AppController < handle
             obj.View.clearReferencePlot();
             obj.View.clearForcingFft();
             obj.View.clearResponseFft();
+        end
+
+        function handleSimParamsChangedCallback(obj, k, b, enabled)
+            obj.Model.setSimulatedParameters(k, b, enabled);
         end
 
         function handleSaveOutputCallback(obj)
