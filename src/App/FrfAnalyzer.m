@@ -28,10 +28,20 @@ classdef FrfAnalyzer
 
             F = specF.complex;
             X = specX.complex;
+            if numel(X) ~= numel(F)
+                X = interp1(specX.freq, specX.complex, specF.freq, 'linear', NaN);
+            end
+
             H = X ./ F;
-            scale = max(abs(F));
-            tiny = abs(F) < max(1e-12, 1e-9 * scale);
-            H(tiny) = NaN;
+            scale = max(abs(F(isfinite(F))));
+            if isempty(scale) || ~(scale > 0)
+                H(:) = NaN;
+            else
+                % Drop bins with no input energy so mag/phase are not Inf
+                % and out-of-band coherence is not plotted as noise.
+                weak = ~isfinite(F) | abs(F) < 1e-3 * scale;
+                H(weak | ~isfinite(H)) = NaN;
+            end
 
             result.n = specF.n;
             result.fs = specF.fs;
@@ -40,6 +50,7 @@ classdef FrfAnalyzer
             result.mag = abs(H);
             result.phase = FrfAnalyzer.wrapPhaseDeg(rad2deg(angle(H)));
             result.coherence = FrfAnalyzer.welchCoherence(t, u, y, result.freq);
+            result.coherence(isnan(H)) = NaN;
         end
 
         function result = emptyResult()
@@ -56,6 +67,9 @@ classdef FrfAnalyzer
 
     methods (Static, Access = private)
         function [t, u, y] = alignPair(tF, f, tX, x)
+            % Put both traces on the response clock (or force clock if
+            % response has no time). Same idea as lab_3 min-length truncate
+            % when timestamps are missing; interpolate when both exist.
             t = zeros(0, 1);
             u = zeros(0, 1);
             y = zeros(0, 1);
@@ -65,57 +79,49 @@ classdef FrfAnalyzer
 
             f = f(:);
             x = x(:);
-            if isempty(tF)
-                tF = (0:numel(f)-1)';
+            tF = tF(:);
+            tX = tX(:);
+
+            nF = min(max(numel(tF), 0), numel(f));
+            nX = min(max(numel(tX), 0), numel(x));
+            if nF > 0
+                f = f(1:nF);
+                tF = tF(1:nF);
+            end
+            if nX > 0
+                x = x(1:nX);
+                tX = tX(1:nX);
+            end
+
+            hasFTime = numel(tF) >= 2 && all(isfinite(tF));
+            hasXTime = numel(tX) >= 2 && all(isfinite(tX));
+
+            if hasXTime && hasFTime
+                t = tX;
+                y = x;
+                u = interp1(tF, f, t, 'linear', NaN);
+            elseif hasXTime
+                t = tX;
+                y = x;
+                L = min(numel(f), numel(y));
+                t = t(1:L);
+                y = y(1:L);
+                u = f(1:L);
+            elseif hasFTime
+                t = tF;
+                u = f;
+                L = min(numel(x), numel(u));
+                t = t(1:L);
+                u = u(1:L);
+                y = x(1:L);
             else
-                tF = tF(:);
-            end
-            if isempty(tX)
-                tX = (0:numel(x)-1)';
-            else
-                tX = tX(:);
+                L = min(numel(f), numel(x));
+                u = f(1:L);
+                y = x(1:L);
+                t = (0:L-1)' * 0.001;
             end
 
-            nF = min(numel(tF), numel(f));
-            nX = min(numel(tX), numel(x));
-            tF = tF(1:nF);
-            f = f(1:nF);
-            tX = tX(1:nX);
-            x = x(1:nX);
-
-            maskF = isfinite(tF) & isfinite(f);
-            maskX = isfinite(tX) & isfinite(x);
-            tF = tF(maskF);
-            f = f(maskF);
-            tX = tX(maskX);
-            x = x(maskX);
-            if numel(tF) < 4 || numel(tX) < 4
-                return;
-            end
-
-            tStart = max(tF(1), tX(1));
-            tEnd = min(tF(end), tX(end));
-            if ~(tEnd > tStart)
-                return;
-            end
-
-            dt = min(mean(diff(tF)), mean(diff(tX)));
-            if ~(dt > 0)
-                return;
-            end
-
-            t = (tStart:dt:tEnd)';
-            if rem(numel(t), 2) ~= 0
-                t = t(1:end-1);
-            end
-            if numel(t) < 4
-                t = zeros(0, 1);
-                return;
-            end
-
-            u = interp1(tF, f, t, 'linear');
-            y = interp1(tX, x, t, 'linear');
-            finiteMask = isfinite(u) & isfinite(y);
+            finiteMask = isfinite(t) & isfinite(u) & isfinite(y);
             t = t(finiteMask);
             u = u(finiteMask);
             y = y(finiteMask);

@@ -80,9 +80,16 @@ classdef FRFPanel < handle
                 obj.clearPlots();
                 return;
             end
-            set(obj.MagLine, 'XData', result.freq, 'YData', result.mag);
-            set(obj.PhaseLine, 'XData', result.freq, 'YData', result.phase);
-            set(obj.CoherenceLine, 'XData', result.freq, 'YData', result.coherence);
+            mag = result.mag;
+            mag(~isfinite(mag)) = NaN;
+            phase = result.phase;
+            phase(~isfinite(phase)) = NaN;
+            coh = result.coherence;
+            coh(~isfinite(coh)) = NaN;
+
+            set(obj.MagLine, 'XData', result.freq, 'YData', mag);
+            set(obj.PhaseLine, 'XData', result.freq, 'YData', phase);
+            set(obj.CoherenceLine, 'XData', result.freq, 'YData', coh);
             xLim = [result.freq(1), result.freq(end)];
             if xLim(2) <= xLim(1)
                 xLim(2) = xLim(1) + 1;
@@ -90,6 +97,17 @@ classdef FRFPanel < handle
             xlim(obj.AxMag, xLim);
             xlim(obj.AxPhase, xLim);
             xlim(obj.AxCoherence, xLim);
+
+            finiteMag = mag(isfinite(mag));
+            if isempty(finiteMag)
+                ylim(obj.AxMag, 'auto');
+            else
+                yTop = max(finiteMag);
+                if ~(yTop > 0)
+                    yTop = 1;
+                end
+                ylim(obj.AxMag, [0, yTop * 1.1]);
+            end
             ylim(obj.AxPhase, [-180, 180]);
             ylim(obj.AxCoherence, [0, 1]);
         end
