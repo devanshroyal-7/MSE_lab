@@ -62,7 +62,7 @@ classdef SignalBuilderController < handle
                 signalNames(i1) = obj.Model.Signals{i1}.Name;
             end
 
-            obj.View.OverallListWidget.OverallListBox.Items = signalNames;
+            obj.View.OverallListWidget.setOverallItems(signalNames);
             
             viewMode = obj.View.OverallListWidget.ViewSwitch.Value;
             overallMode = obj.View.OverallListWidget.OverallMode;
@@ -87,7 +87,7 @@ classdef SignalBuilderController < handle
 
                 if isempty(selectedSigIdx) || selectedSigIdx < 1 || selectedSigIdx > length(obj.Model.Signals)
                     selectedSigIdx = 1;
-                    obj.View.OverallListWidget.OverallListBox.ValueIndex = 1;
+                    obj.View.OverallListWidget.selectOverallIndexSilent(1);
                 end
 
                 [t, y] = obj.Model.evaluateIndividualSignal(selectedSigIdx);
@@ -100,7 +100,9 @@ classdef SignalBuilderController < handle
         end
 
         function handleAddCallback(obj, selectedSignal)
-            if obj.View.ActivePanelName ~= string(selectedSignal)
+            % Available is empty while Overall is selected; keep the current
+            % setup panel in that case instead of swapping to an empty name.
+            if ~isempty(selectedSignal) && obj.View.ActivePanelName ~= string(selectedSignal)
                 obj.View.swapActivePanel(selectedSignal)
             end
             

@@ -2,7 +2,8 @@ classdef OverallPanel < handle
     % Left column of the forcing builder: Available types vs Overall stack,
     % Add/Remove/Clear, and Single/Overall plot switch.
     % OverallMode is 'available' while previewing a type, 'overall' while
-    % editing a signal already on the stack.
+    % editing a signal already on the stack. Add switches from available
+    % to overall and selects the last stacked signal.
     %
     %{
     Example usage:
@@ -101,9 +102,17 @@ classdef OverallPanel < handle
         end
 
         function handleAddPushed(obj)
-            if ~isempty(obj.AddCallback)
-                selectedSignal = obj.AvailableListBox.Value;
-                obj.AddCallback(selectedSignal);
+            if isempty(obj.AddCallback)
+                return;
+            end
+
+            nBefore = numel(obj.OverallListBox.Items);
+            obj.AddCallback(obj.AvailableListBox.Value);
+            nAfter = numel(obj.OverallListBox.Items);
+
+            % Successful add: leave Available and select the new stack item.
+            if nAfter > nBefore
+                obj.enterOverallMode(nAfter, false);
             end
         end
 
@@ -117,38 +126,17 @@ classdef OverallPanel < handle
         end
 
         function handleSelectAvailableListBox(obj, ~, event)
-            obj.OverallMode = 'available';
-
-            obj.OverallListBox.Value = string.empty;
-
-            obj.ViewSwitch.Value = 'Single';
-
-            obj.ViewSwitch.Enable = 'off';   % Single/Overall only applies to the stack
-            
-            if ~isempty(obj.SelectAvailableCallback)
-                selectedSignal = string(event.Value);
-                obj.SelectAvailableCallback(selectedSignal);
-            end
+            obj.enterAvailableMode(string(event.Value));
         end
 
         function handleSelectOverallListBox(obj, ~, event)
-            obj.OverallMode = 'overall';
-
-            obj.AvailableListBox.Value = string.empty;
-
-            obj.ViewSwitch.Enable = 'on';
-
-            if ~isempty(obj.SelectOverallCallback)
-                selectedSignal = event.ValueIndex;
-
-                % Rebuild the setup panel only when the selected type changes.
-                if strcmp(event.Value, event.PreviousValue)
-                    swapFlag = false;
-                else
-                    swapFlag = true;
-                end
-                obj.SelectOverallCallback(selectedSignal, swapFlag);
+            % Rebuild the setup panel only when the selected type changes.
+            if strcmp(event.Value, event.PreviousValue)
+                swapFlag = false;
+            else
+                swapFlag = true;
             end
+            obj.enterOverallMode(event.ValueIndex, swapFlag);
         end
 
         function handleViewSwitchCallback(obj, ~, ~)
@@ -157,14 +145,80 @@ classdef OverallPanel < handle
             end
         end
 
+        function enterAvailableMode(obj, signalName)
+            % Preview a type from the Available list: deselect Overall,
+            % lock plot view to Single, and refresh the setup panel.
+            obj.OverallMode = 'available';
+
+            obj.setListValueSilent(obj.OverallListBox, string.empty);
+
+            obj.ViewSwitch.Value = 'Single';
+            obj.ViewSwitch.Enable = 'off';   % Single/Overall only applies to the stack
+
+            if ~isempty(obj.SelectAvailableCallback)
+                obj.SelectAvailableCallback(string(signalName));
+            end
+        end
+
+        function enterOverallMode(obj, idx, swapFlag)
+            % Edit a stacked signal: deselect Available, enable plot view,
+            % and select Overall item idx.
+            if isempty(idx) || idx < 1 || idx > numel(obj.OverallListBox.Items)
+                return;
+            end
+
+            obj.OverallMode = 'overall';
+
+            obj.setListValueSilent(obj.AvailableListBox, string.empty);
+
+            obj.ViewSwitch.Enable = 'on';
+
+            obj.selectOverallIndexSilent(idx);
+
+            if ~isempty(obj.SelectOverallCallback)
+                obj.SelectOverallCallback(idx, swapFlag);
+            end
+        end
+
+        function setOverallItems(obj, signalNames)
+            % Refresh the Overall list without firing ValueChangedFcn
+            % (MATLAB may auto-select the first item when Items changes).
+            fcn = obj.OverallListBox.ValueChangedFcn;
+            obj.OverallListBox.ValueChangedFcn = [];
+            obj.OverallListBox.Items = signalNames;
+            if strcmp(obj.OverallMode, 'available')
+                obj.OverallListBox.Value = string.empty;
+            end
+            obj.OverallListBox.ValueChangedFcn = fcn;
+        end
+
+        function selectOverallIndexSilent(obj, idx)
+            obj.setListValueSilent(obj.OverallListBox, [], idx);
+        end
+
         function resetOverallWidget(obj)
             obj.OverallMode = 'available';
 
-            obj.AvailableListBox.Value = 'Custom';
-
-            obj.OverallListBox.Value = string.empty;
+            obj.setListValueSilent(obj.AvailableListBox, 'Custom');
+            obj.setListValueSilent(obj.OverallListBox, string.empty);
 
             obj.ViewSwitch.Value = 'Single';
+            obj.ViewSwitch.Enable = 'off';
+        end
+    end
+
+    methods (Access = private)
+        function setListValueSilent(~, listBox, value, valueIndex)
+            % Assign Value/ValueIndex without running ValueChangedFcn so
+            % Available <-> Overall switches do not bounce the other list.
+            fcn = listBox.ValueChangedFcn;
+            listBox.ValueChangedFcn = [];
+            if nargin >= 4 && ~isempty(valueIndex)
+                listBox.ValueIndex = valueIndex;
+            else
+                listBox.Value = value;
+            end
+            listBox.ValueChangedFcn = fcn;
         end
     end
 end
