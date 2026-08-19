@@ -215,8 +215,8 @@ classdef AppView < handle
             selected = obj.TabGroup.SelectedTab;
             onControlsTime = ~isempty(obj.ControlsTimeTab) && isequal(selected, obj.ControlsTimeTab);
             onControlsFreq = ~isempty(obj.ControlsFreqTab) && isequal(selected, obj.ControlsFreqTab);
-            obj.Sidebar.setControlPanelsVisible( ...
-                onControlsTime || onControlsFreq, onControlsFreq);
+            onControls = onControlsTime || onControlsFreq;
+            obj.Sidebar.setControlPanelsVisible(onControls, onControls);
         end
     end
 end
