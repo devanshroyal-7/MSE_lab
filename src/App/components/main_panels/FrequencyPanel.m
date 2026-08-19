@@ -51,6 +51,10 @@ classdef FrequencyPanel < handle
             title(obj.AxResponseMag, "Response FFT Magnitude", "FontWeight", "bold", "FontSize", 17);
             title(obj.AxForcingPhase, "Forcing FFT Phase", "FontWeight", "bold", "FontSize", 17);
             title(obj.AxResponsePhase, "Response FFT Phase", "FontWeight", "bold", "FontSize", 17);
+            obj.AxForcingMag.TitleHorizontalAlignment = "left";
+            obj.AxResponseMag.TitleHorizontalAlignment = "left";
+            obj.AxForcingPhase.TitleHorizontalAlignment = "left";
+            obj.AxResponsePhase.TitleHorizontalAlignment = "left";
         end
 
         function updateForcing(obj, spec)

@@ -46,6 +46,10 @@ classdef ControlsPanel < handle
             title(obj.AxReferenceInput, "Reference Input", "FontWeight", "bold", "FontSize", 17);
             title(obj.AxError, "Error", "FontWeight", "bold", "FontSize", 17);
             title(obj.AxEffort, "Control Effort", "FontWeight", "bold", "FontSize", 17);
+            obj.AxDisplacement.TitleHorizontalAlignment = "left";
+            obj.AxReferenceInput.TitleHorizontalAlignment = "left";
+            obj.AxError.TitleHorizontalAlignment = "left";
+            obj.AxEffort.TitleHorizontalAlignment = "left";
         end
 
         function updateDisplacement(obj, t, y)
