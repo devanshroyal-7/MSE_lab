@@ -14,9 +14,7 @@ classdef TimePanel < handle
 
     properties
         MainLayoutGrid
-        ResponseLabel
         ResponsePlot
-        ReferenceLabel
         ReferencePlot
         OverlayCheckBox
         AutoscaleCheckBox
@@ -32,30 +30,22 @@ classdef TimePanel < handle
     end
     methods
         function obj = TimePanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [6, 2]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [3, 2]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, '1x', 35, 30, '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {'1x', 35, '1x'};
             obj.MainLayoutGrid.RowSpacing = 5;
 
             % Response Section (Top)
-            obj.ResponseLabel = uilabel(obj.MainLayoutGrid, ...
-                "Text", "Response Plot", ...
-                "FontWeight", "bold", ...
-                "FontSize", 17, ...
-                "VerticalAlignment", "bottom");
-            obj.ResponseLabel.Layout.Column = [1 2];
-            obj.ResponseLabel.Layout.Row = 1;
-            
             obj.ResponsePlot = uiaxes(obj.MainLayoutGrid, ...
                 "XGrid", "on", ...
                 "YGrid", "on");
             obj.ResponsePlot.Layout.Column = [1 2];
-            obj.ResponsePlot.Layout.Row = 2;
+            obj.ResponsePlot.Layout.Row = 1;
             
             padCheckbox = uigridlayout(obj.MainLayoutGrid, [1, 4]);
             padCheckbox.Padding = [0, 0, 0, 10];
             padCheckbox.Layout.Column = [1 2];
-            padCheckbox.Layout.Row = 3;
+            padCheckbox.Layout.Row = 2;
             padCheckbox.ColumnWidth = {'1x', 140, 160, 140};
 
             obj.YLimCheckBox = uicheckbox(padCheckbox, ...
@@ -77,17 +67,9 @@ classdef TimePanel < handle
             obj.OverlayCheckBox.Layout.Column = 4;
 
             % Reference Section (Bottom)
-            obj.ReferenceLabel = uilabel(obj.MainLayoutGrid, ...
-                "Text", "Reference Plot", ...
-                "FontWeight", "bold", ...
-                "FontSize", 17, ...
-                "VerticalAlignment", "bottom");
-            obj.ReferenceLabel.Layout.Column = [1 2];
-            obj.ReferenceLabel.Layout.Row = 4; 
-            
             obj.ReferencePlot = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
             obj.ReferencePlot.Layout.Column = [1 2];
-            obj.ReferencePlot.Layout.Row = 5; 
+            obj.ReferencePlot.Layout.Row = 3; 
 
             % Handle to manipulate plots
             obj.RefLineHandle = plot(obj.ReferencePlot, NaN, NaN, 'b-', LineWidth=1.5);
@@ -106,6 +88,9 @@ classdef TimePanel < handle
             obj.OverlayLineHandle.Visible = 'off';
             obj.ResponsePlot.YAxis(2).Visible = 'off';
             yyaxis(obj.ResponsePlot, 'left');
+
+            title(obj.ResponsePlot, "Response Plot", "FontWeight", "bold", "FontSize", 17);
+            title(obj.ReferencePlot, "Reference Plot", "FontWeight", "bold", "FontSize", 17);
         end
 
         function setReferenceQuantity(obj, quantity)
