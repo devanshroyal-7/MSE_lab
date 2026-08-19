@@ -17,13 +17,9 @@ classdef FrequencyPanel < handle
 
     properties
         MainLayoutGrid
-        ForcingMagLabel
         AxForcingMag
-        ForcingPhaseLabel
         AxForcingPhase
-        ResponseMagLabel
         AxResponseMag
-        ResponsePhaseLabel
         AxResponsePhase
 
         ForcingMagLine
@@ -33,20 +29,15 @@ classdef FrequencyPanel < handle
     end
     methods
         function obj = FrequencyPanel(parentContainer)
-            % Same pattern as TimePanel: labels + axes on one grid, no nested panels.
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [4, 2]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 2]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, '1x', 30, '1x'};
+            obj.MainLayoutGrid.RowHeight = {'1x', '1x'};
             obj.MainLayoutGrid.RowSpacing = 5;
 
-            [obj.ForcingMagLabel, obj.AxForcingMag] = obj.createPlotCell( ...
-                1, 2, 1, "Forcing FFT Magnitude", "Magnitude (N)");
-            [obj.ResponseMagLabel, obj.AxResponseMag] = obj.createPlotCell( ...
-                1, 2, 2, "Response FFT Magnitude", "Magnitude (m)");
-            [obj.ForcingPhaseLabel, obj.AxForcingPhase] = obj.createPlotCell( ...
-                3, 4, 1, "Forcing FFT Phase", "Phase (deg)");
-            [obj.ResponsePhaseLabel, obj.AxResponsePhase] = obj.createPlotCell( ...
-                3, 4, 2, "Response FFT Phase", "Phase (deg)");
+            obj.AxForcingMag = obj.createPlotCell(1, 1, "Magnitude (N)");
+            obj.AxResponseMag = obj.createPlotCell(1, 2, "Magnitude (m)");
+            obj.AxForcingPhase = obj.createPlotCell(2, 1, "Phase (deg)");
+            obj.AxResponsePhase = obj.createPlotCell(2, 2, "Phase (deg)");
 
             ylim(obj.AxForcingPhase, [-180, 180]);
             ylim(obj.AxResponsePhase, [-180, 180]);
@@ -55,6 +46,11 @@ classdef FrequencyPanel < handle
             obj.ForcingPhaseLine = plot(obj.AxForcingPhase, NaN, NaN, 'b-', LineWidth=1.5);
             obj.ResponseMagLine = plot(obj.AxResponseMag, NaN, NaN, 'r-', LineWidth=1.5);
             obj.ResponsePhaseLine = plot(obj.AxResponsePhase, NaN, NaN, 'r-', LineWidth=1.5);
+
+            title(obj.AxForcingMag, "Forcing FFT Magnitude", "FontWeight", "bold", "FontSize", 17);
+            title(obj.AxResponseMag, "Response FFT Magnitude", "FontWeight", "bold", "FontSize", 17);
+            title(obj.AxForcingPhase, "Forcing FFT Phase", "FontWeight", "bold", "FontSize", 17);
+            title(obj.AxResponsePhase, "Response FFT Phase", "FontWeight", "bold", "FontSize", 17);
         end
 
         function updateForcing(obj, spec)
@@ -75,18 +71,9 @@ classdef FrequencyPanel < handle
     end
 
     methods (Access = private)
-        function [label, ax] = createPlotCell(obj, labelRow, axesRow, col, titleText, yLabel)
-            label = uilabel(obj.MainLayoutGrid, ...
-                "Text", titleText, ...
-                "FontWeight", "bold", ...
-                "FontSize", 17, ...
-                "HorizontalAlignment", "center", ...
-                "VerticalAlignment", "bottom");
-            label.Layout.Row = labelRow;
-            label.Layout.Column = col;
-
+        function ax = createPlotCell(obj, row, col, yLabel)
             ax = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
-            ax.Layout.Row = axesRow;
+            ax.Layout.Row = row;
             ax.Layout.Column = col;
             xlabel(ax, 'Frequency (Hz)');
             ylabel(ax, yLabel);

@@ -44,6 +44,8 @@ classdef ControlsFrequencyPanel < handle
 
             title(obj.AxMag, "Bode Magnitude", "FontWeight", "bold", "FontSize", 17);
             title(obj.AxPhase, "Bode Phase", "FontWeight", "bold", "FontSize", 17);
+            obj.AxMag.TitleHorizontalAlignment = "left";
+            obj.AxPhase.TitleHorizontalAlignment = "left";
         end
     end
 end

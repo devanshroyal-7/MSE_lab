@@ -91,6 +91,8 @@ classdef TimePanel < handle
 
             title(obj.ResponsePlot, "Response Plot", "FontWeight", "bold", "FontSize", 17);
             title(obj.ReferencePlot, "Reference Plot", "FontWeight", "bold", "FontSize", 17);
+            obj.ResponsePlot.TitleHorizontalAlignment = "left";
+            obj.ReferencePlot.TitleHorizontalAlignment = "left";
         end
 
         function setReferenceQuantity(obj, quantity)

@@ -15,13 +15,9 @@ classdef ControlsPanel < handle
 
     properties
         MainLayoutGrid
-        DisplacementLabel
         AxDisplacement
-        ReferenceInputLabel
         AxReferenceInput
-        ErrorLabel
         AxError
-        EffortLabel
         AxEffort
 
         DisplacementLine
@@ -31,24 +27,25 @@ classdef ControlsPanel < handle
     end
     methods
         function obj = ControlsPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [4, 2]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [2, 2]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, '1x', 30, '1x'};
+            obj.MainLayoutGrid.RowHeight = {'1x', '1x'};
             obj.MainLayoutGrid.RowSpacing = 5;
 
-            [obj.DisplacementLabel, obj.AxDisplacement] = obj.createPlotCell( ...
-                1, 2, 1, "Displacement", "Displacement (m)");
-            [obj.ReferenceInputLabel, obj.AxReferenceInput] = obj.createPlotCell( ...
-                1, 2, 2, "Reference Input", "Force (N)");
-            [obj.ErrorLabel, obj.AxError] = obj.createPlotCell( ...
-                3, 4, 1, "Error", "Error (m)");
-            [obj.EffortLabel, obj.AxEffort] = obj.createPlotCell( ...
-                3, 4, 2, "Control Effort", "Control Effort (N)");
+            obj.AxDisplacement = obj.createPlotCell(1, 1, "Displacement (m)");
+            obj.AxReferenceInput = obj.createPlotCell(1, 2, "Force (N)");
+            obj.AxError = obj.createPlotCell(2, 1, "Error (m)");
+            obj.AxEffort = obj.createPlotCell(2, 2, "Control Effort (N)");
 
             obj.DisplacementLine = plot(obj.AxDisplacement, NaN, NaN, 'r-', LineWidth=1.5);
             obj.ReferenceInputLine = plot(obj.AxReferenceInput, NaN, NaN, 'b-', LineWidth=1.5);
             obj.ErrorLine = plot(obj.AxError, NaN, NaN, 'r-', LineWidth=1.5);
             obj.EffortLine = plot(obj.AxEffort, NaN, NaN, 'b-', LineWidth=1.5);
+
+            title(obj.AxDisplacement, "Displacement", "FontWeight", "bold", "FontSize", 17);
+            title(obj.AxReferenceInput, "Reference Input", "FontWeight", "bold", "FontSize", 17);
+            title(obj.AxError, "Error", "FontWeight", "bold", "FontSize", 17);
+            title(obj.AxEffort, "Control Effort", "FontWeight", "bold", "FontSize", 17);
         end
 
         function updateDisplacement(obj, t, y)
@@ -80,18 +77,9 @@ classdef ControlsPanel < handle
     end
 
     methods (Access = private)
-        function [label, ax] = createPlotCell(obj, labelRow, axesRow, col, titleText, yLabel)
-            label = uilabel(obj.MainLayoutGrid, ...
-                "Text", titleText, ...
-                "FontWeight", "bold", ...
-                "FontSize", 17, ...
-                "HorizontalAlignment", "center", ...
-                "VerticalAlignment", "bottom");
-            label.Layout.Row = labelRow;
-            label.Layout.Column = col;
-
+        function ax = createPlotCell(obj, row, col, yLabel)
             ax = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
-            ax.Layout.Row = axesRow;
+            ax.Layout.Row = row;
             ax.Layout.Column = col;
             xlabel(ax, 'Time (s)');
             ylabel(ax, yLabel);
