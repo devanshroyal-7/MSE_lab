@@ -108,15 +108,22 @@ classdef AppController < handle
 
                     tRun = tic;
                     runLimit = obj.Model.S + timeout_s;
+                    pollDt = obj.Model.livePollPeriod();
+                    plotDt = 0.1;
+                    tLastPlot = -inf;
 
                     while ~obj.StopRequested ...
                             && obj.Model.isSimulationRunning() ...
                             && toc(tRun) < runLimit
-                        obj.plotLiveResponse();
-                        % pause already flushes graphics. Extra drawnow here
-                        % plus yyaxis/xlim on uiaxes causes SceneTree
-                        % replaceChild warnings.
-                        pause(0.1);
+                        % Capture every ExtMode Duration-sized packet. Plot
+                        % slower so the UI does not stall the stitcher.
+                        obj.Model.pumpLiveBuffers();
+                        if toc(tRun) - tLastPlot >= plotDt
+                            obj.plotLiveResponse();
+                            tLastPlot = toc(tRun);
+                            obj.Model.pumpLiveBuffers();
+                        end
+                        pause(pollDt);
                     end
 
                     if obj.StopRequested || obj.Model.isSimulationRunning()

@@ -65,6 +65,8 @@ classdef AppModel < handle
         LiveArmedEffort (1,1) logical = false
         LiveAcceptLate (1,1) logical = false
         StaleSdiRunId = []
+        StaleSdiFingerprint = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN)
+        SdiFreshForThisRun (1,1) logical = false
     end
 
     events 
@@ -278,7 +280,8 @@ classdef AppModel < handle
             obj.LiveArmedError = false;
             obj.LiveArmedEffort = false;
             obj.LiveAcceptLate = false;
-            obj.StaleSdiRunId = obj.currentSdiRunId();
+            obj.SdiFreshForThisRun = false;
+            obj.snapshotStaleSdi();
 
             obj.ensureExternalMode();
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
@@ -302,19 +305,31 @@ classdef AppModel < handle
             obj.stopTargetQuietly();
         end
 
+        function pumpLiveBuffers(obj)
+            % Pull the latest ExtMode / SDI packets into the stitched
+            % buffers. Must run at least as often as ExtMode Duration or
+            % workspace-only dumps drop every other packet.
+            obj.captureLiveCart1Chunk();
+            obj.captureLiveFInputChunk();
+            obj.captureLiveNamedChunk('error', 'error', ...
+                'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
+            obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
+                'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
+        end
+
+        function dt = livePollPeriod(obj)
+            % ExtMode uploads LiveBufferSamples at a time (0.05 s at T=0.001).
+            % Poll faster than that so the host sees consecutive packets.
+            bufferSec = obj.LiveBufferSamples * obj.T;
+            dt = min(0.04, max(0.015, 0.4 * bufferSec));
+        end
+
         function finalizeLoggedSignals(obj)
             % Wait out the last upload packets, then prefer the longest
             % stitched / SDI record over the Duration-sized workspace dump.
             obj.LiveAcceptLate = true;
             obj.waitForRemainingPackets();
-            obj.adoptRicherLog('TimeBuffer', 'PositionBuffer', 'LiveArmed', ...
-                'cart1_position', 'Cart1-Position');
-            obj.adoptRicherLog('ForcingTimeBuffer', 'ForcingBuffer', 'LiveArmedForcing', ...
-                'f_input', 'f_input');
-            obj.adoptRicherLog('ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError', ...
-                'error', 'error');
-            obj.adoptRicherLog('EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort', ...
-                'control_effort', 'control_effort');
+            obj.adoptAllRicherLogs();
             obj.promoteLoggedSignalsToWorkspace();
             obj.LiveAcceptLate = false;
         end
@@ -399,40 +414,45 @@ classdef AppModel < handle
         end
 
         function waitForRemainingPackets(obj)
-            lastN = numel(obj.TimeBuffer);
-            stall = 0;
+            % Do not treat t(end)≈S as complete: a gappy stitch of every
+            % other ExtMode packet still ends near StopTime. Wait until the
+            % sample count is ~S/T or SDI replaces the buffer with a full
+            % record.
             t0 = tic;
-            while toc(t0) < 2.5
-                obj.captureLiveCart1Chunk();
-                obj.captureLiveFInputChunk();
-                obj.captureLiveNamedChunk('error', 'error', ...
-                    'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
-                obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
-                    'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
-                n = numel(obj.TimeBuffer);
-                if n <= lastN
-                    stall = stall + 1;
-                else
-                    stall = 0;
-                    lastN = n;
-                end
-                if obj.logCoversStopTime() && stall >= 3
+            while toc(t0) < 5
+                obj.pumpLiveBuffers();
+                obj.adoptAllRicherLogs();
+                if obj.logLooksComplete()
                     return;
                 end
-                if stall >= 12
-                    return;
-                end
-                pause(0.05);
+                pause(obj.livePollPeriod());
                 drawnow;
             end
         end
 
-        function tf = logCoversStopTime(obj)
+        function n = expectedSampleCount(obj)
+            n = max(2, round(obj.S / obj.T));
+        end
+
+        function tf = logLooksComplete(obj)
             tf = false;
             if isempty(obj.TimeBuffer)
                 return;
             end
-            tf = obj.TimeBuffer(end) >= 0.9 * obj.S;
+            nOk = numel(obj.TimeBuffer) >= 0.90 * obj.expectedSampleCount();
+            tOk = obj.TimeBuffer(end) >= 0.90 * obj.S;
+            tf = nOk && tOk;
+        end
+
+        function adoptAllRicherLogs(obj)
+            obj.adoptRicherLog('TimeBuffer', 'PositionBuffer', 'LiveArmed', ...
+                'cart1_position', 'Cart1-Position');
+            obj.adoptRicherLog('ForcingTimeBuffer', 'ForcingBuffer', 'LiveArmedForcing', ...
+                'f_input', 'f_input');
+            obj.adoptRicherLog('ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError', ...
+                'error', 'error');
+            obj.adoptRicherLog('EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort', ...
+                'control_effort', 'control_effort');
         end
 
         function adoptRicherLog(obj, tField, yField, armedField, wsName, sdiName)
@@ -465,6 +485,9 @@ classdef AppModel < handle
                 score = n + 1e6 * max(tSpan, 0);
                 if ti(1) <= max(0.5, 0.1 * obj.S)
                     score = score + 1e9;
+                end
+                if n >= 0.90 * obj.expectedSampleCount()
+                    score = score + 1e8;
                 end
                 if score > bestScore
                     bestScore = score;
@@ -516,15 +539,19 @@ classdef AppModel < handle
         function captureLiveCart1Chunk(obj)
             [t, y] = obj.readWorkspaceCart1();
             obj.appendLiveChunk(t, y);
-            [t, y] = obj.readSdiNamed('Cart1-Position');
-            obj.appendLiveChunk(t, y);
+            if obj.LiveAcceptLate
+                [t, y] = obj.readSdiNamed('Cart1-Position');
+                obj.appendLiveChunk(t, y);
+            end
         end
 
         function captureLiveFInputChunk(obj)
             [t, y] = obj.readWorkspaceNamed('f_input');
             obj.appendLiveForcingChunk(t, y);
-            [t, y] = obj.readSdiNamed('f_input');
-            obj.appendLiveForcingChunk(t, y);
+            if obj.LiveAcceptLate
+                [t, y] = obj.readSdiNamed('f_input');
+                obj.appendLiveForcingChunk(t, y);
+            end
         end
 
         function captureLiveNamedChunk(obj, wsName, sdiName, tField, yField, armedField)
@@ -532,10 +559,12 @@ classdef AppModel < handle
             [obj.(tField), obj.(yField), obj.(armedField)] = ...
                 obj.appendLiveSamples(obj.(tField), obj.(yField), ...
                 obj.(armedField), t, y);
-            [t, y] = obj.readSdiNamed(sdiName);
-            [obj.(tField), obj.(yField), obj.(armedField)] = ...
-                obj.appendLiveSamples(obj.(tField), obj.(yField), ...
-                obj.(armedField), t, y);
+            if obj.LiveAcceptLate
+                [t, y] = obj.readSdiNamed(sdiName);
+                [obj.(tField), obj.(yField), obj.(armedField)] = ...
+                    obj.appendLiveSamples(obj.(tField), obj.(yField), ...
+                    obj.(armedField), t, y);
+            end
         end
 
         function [t, y] = readWorkspaceNamed(obj, varName)
@@ -548,11 +577,11 @@ classdef AppModel < handle
                 raw = evalin('base', varName);
                 [t, y] = AppModel.signalValuesToXY(raw);
                 if isempty(t) && ~isempty(y) && evalin('base', "exist('rt_time', 'var')")
-                    t = squeeze(evalin('base', 'rt_time'));
-                    t = t(:);
-                    n = min(numel(t), numel(y));
-                    t = t(1:n);
-                    y = y(1:n);
+                    tWs = squeeze(evalin('base', 'rt_time'));
+                    tWs = tWs(:);
+                    if numel(tWs) == numel(y)
+                        t = tWs;
+                    end
                 end
             catch
             end
@@ -565,8 +594,7 @@ classdef AppModel < handle
         function id = currentSdiRunId(obj)
             id = [];
             try
-                runObj = Simulink.sdi.getCurrentSimulationRun( ...
-                    char(obj.SimulationModelName));
+                runObj = obj.currentSdiRun();
                 if ~isempty(runObj)
                     id = runObj.id;
                 end
@@ -574,15 +602,34 @@ classdef AppModel < handle
             end
         end
 
+        function snapshotStaleSdi(obj)
+            obj.StaleSdiRunId = obj.currentSdiRunId();
+            [t, y, runObj] = obj.fetchSdiNamed('Cart1-Position');
+            obj.StaleSdiFingerprint = obj.makeSdiFingerprint(runObj, t, y);
+        end
+
         function [t, y] = readSdiNamed(obj, nameFragment)
             t = [];
             y = [];
+            [tRaw, yRaw, runObj] = obj.fetchSdiNamed(nameFragment);
+            if isempty(yRaw)
+                return;
+            end
+            if obj.sdiRecordIsStale(runObj, tRaw, yRaw)
+                return;
+            end
+            obj.SdiFreshForThisRun = true;
+            t = tRaw;
+            y = yRaw;
+        end
+
+        function [t, y, runObj] = fetchSdiNamed(obj, nameFragment)
+            t = [];
+            y = [];
+            runObj = [];
             try
                 runObj = obj.currentSdiRun();
                 if isempty(runObj)
-                    return;
-                end
-                if ~isempty(obj.StaleSdiRunId) && isequal(runObj.id, obj.StaleSdiRunId)
                     return;
                 end
                 sigs = runObj.getAllSignals();
@@ -597,10 +644,44 @@ classdef AppModel < handle
                         hit = i;
                     end
                 end
-                if ~isempty(hit)
-                    [t, y] = AppModel.signalValuesToXY(sigs(hit).Values);
+                if isempty(hit)
+                    return;
                 end
+                [t, y] = AppModel.signalValuesToXY(sigs(hit).Values);
             catch
+            end
+        end
+
+        function tf = sdiRecordIsStale(obj, runObj, t, y)
+            tf = false;
+            if obj.SdiFreshForThisRun || isempty(y)
+                return;
+            end
+            fp = obj.StaleSdiFingerprint;
+            if isempty(fp) || fp.n <= 0
+                return;
+            end
+            if ~isempty(obj.StaleSdiRunId) && ~isempty(runObj) ...
+                    && ~isequal(runObj.id, obj.StaleSdiRunId)
+                return;
+            end
+            tf = numel(y) == fp.n ...
+                && isequaln(y(end), fp.yEnd) ...
+                && (isempty(t) || isequaln(t(end), fp.tEnd));
+        end
+
+        function fp = makeSdiFingerprint(~, runObj, t, y)
+            fp = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN, 'id', []);
+            if ~isempty(runObj)
+                fp.id = runObj.id;
+            end
+            if isempty(y)
+                return;
+            end
+            fp.n = numel(y);
+            fp.yEnd = y(end);
+            if ~isempty(t)
+                fp.tEnd = t(end);
             end
         end
 
@@ -659,6 +740,17 @@ classdef AppModel < handle
                     timeBuf = t;
                     yBuf = y;
                 end
+                return;
+            end
+
+            % SDI often holds the full record while workspace only has the
+            % latest Duration packet. append-after-end cannot fill holes, so
+            % replace when the incoming series is a longer covering record.
+            covers = t(1) <= timeBuf(1) + obj.T ...
+                && t(end) >= timeBuf(end) - obj.T;
+            if covers && numel(t) > numel(timeBuf)
+                timeBuf = t;
+                yBuf = y;
                 return;
             end
 
