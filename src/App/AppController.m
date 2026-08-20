@@ -120,10 +120,10 @@ classdef AppController < handle
                     end
 
                     if obj.StopRequested || obj.Model.isSimulationRunning()
-                        obj.Model.stopSimulation();
+                        obj.Model.haltKernel();
                     end
 
-                    pause(0.2);
+                    obj.Model.finalizeLoggedSignals();
                     obj.plotLoggedResponse();
                     obj.plotResponseFft();
                     obj.plotFrf();
@@ -147,10 +147,14 @@ classdef AppController < handle
         function handleStopSimCallback(obj)
             obj.StopRequested = true;
             try
-                obj.Model.stopSimulation();
+                if obj.RunInProgress
+                    obj.Model.haltKernel();
+                else
+                    obj.Model.stopSimulation();
+                    obj.restoreIdleUi();
+                end
             catch
             end
-            obj.restoreIdleUi();
         end
 
         function handleSignalBuilderCallback(obj)

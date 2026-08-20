@@ -63,6 +63,7 @@ classdef AppModel < handle
         LiveArmedForcing (1,1) logical = false
         LiveArmedError (1,1) logical = false
         LiveArmedEffort (1,1) logical = false
+        LiveAcceptLate (1,1) logical = false
         StaleSdiRunId = []
     end
 
@@ -276,6 +277,7 @@ classdef AppModel < handle
             obj.LiveArmedForcing = false;
             obj.LiveArmedError = false;
             obj.LiveArmedEffort = false;
+            obj.LiveAcceptLate = false;
             obj.StaleSdiRunId = obj.currentSdiRunId();
 
             obj.ensureExternalMode();
@@ -294,7 +296,32 @@ classdef AppModel < handle
             obj.disconnectTargetQuietly();
         end
 
+        function haltKernel(obj)
+            % Stop the current run but keep the external-mode connection
+            % so the last ExtMode / SDI packets can still land.
+            obj.stopTargetQuietly();
+        end
+
+        function finalizeLoggedSignals(obj)
+            % Wait out the last upload packets, then prefer the longest
+            % stitched / SDI record over the Duration-sized workspace dump.
+            obj.LiveAcceptLate = true;
+            obj.waitForRemainingPackets();
+            obj.adoptRicherLog('TimeBuffer', 'PositionBuffer', 'LiveArmed', ...
+                'cart1_position', 'Cart1-Position');
+            obj.adoptRicherLog('ForcingTimeBuffer', 'ForcingBuffer', 'LiveArmedForcing', ...
+                'f_input', 'f_input');
+            obj.adoptRicherLog('ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError', ...
+                'error', 'error');
+            obj.adoptRicherLog('EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort', ...
+                'control_effort', 'control_effort');
+            obj.promoteLoggedSignalsToWorkspace();
+            obj.LiveAcceptLate = false;
+        end
+
         function run = collectRunData(obj)
+            obj.finalizeLoggedSignals();
+
             names = [ ...
                 "rt_time", "f_input", "error", "control_effort", ...
                 "cart1_position", "cart2_position", ...
@@ -371,6 +398,121 @@ classdef AppModel < handle
             end
         end
 
+        function waitForRemainingPackets(obj)
+            lastN = numel(obj.TimeBuffer);
+            stall = 0;
+            t0 = tic;
+            while toc(t0) < 2.5
+                obj.captureLiveCart1Chunk();
+                obj.captureLiveFInputChunk();
+                obj.captureLiveNamedChunk('error', 'error', ...
+                    'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
+                obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
+                    'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
+                n = numel(obj.TimeBuffer);
+                if n <= lastN
+                    stall = stall + 1;
+                else
+                    stall = 0;
+                    lastN = n;
+                end
+                if obj.logCoversStopTime() && stall >= 3
+                    return;
+                end
+                if stall >= 12
+                    return;
+                end
+                pause(0.05);
+                drawnow;
+            end
+        end
+
+        function tf = logCoversStopTime(obj)
+            tf = false;
+            if isempty(obj.TimeBuffer)
+                return;
+            end
+            tf = obj.TimeBuffer(end) >= 0.9 * obj.S;
+        end
+
+        function adoptRicherLog(obj, tField, yField, armedField, wsName, sdiName)
+            candidates = {};
+            if ~isempty(obj.(yField))
+                candidates{end+1} = {obj.(tField)(:), obj.(yField)(:)}; %#ok<AGROW>
+            end
+            [t, y] = obj.readWorkspaceNamed(wsName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
+            end
+            [t, y] = obj.readSdiNamed(sdiName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
+            end
+
+            bestT = [];
+            bestY = [];
+            bestScore = -1;
+            for i = 1:numel(candidates)
+                ti = candidates{i}{1};
+                yi = candidates{i}{2};
+                n = min(numel(ti), numel(yi));
+                if n < 2
+                    continue;
+                end
+                ti = ti(1:n);
+                yi = yi(1:n);
+                tSpan = ti(end) - ti(1);
+                score = n + 1e6 * max(tSpan, 0);
+                if ti(1) <= max(0.5, 0.1 * obj.S)
+                    score = score + 1e9;
+                end
+                if score > bestScore
+                    bestScore = score;
+                    bestT = ti;
+                    bestY = yi;
+                end
+            end
+            if ~isempty(bestY)
+                obj.(tField) = bestT(:)';
+                obj.(yField) = bestY(:)';
+                obj.(armedField) = true;
+            end
+        end
+
+        function promoteLoggedSignalsToWorkspace(obj)
+            if ~isempty(obj.TimeBuffer)
+                assignin('base', 'rt_time', obj.TimeBuffer(:));
+            end
+            if ~isempty(obj.PositionBuffer)
+                assignin('base', 'cart1_position', obj.PositionBuffer(:));
+            end
+            if ~isempty(obj.ForcingBuffer)
+                assignin('base', 'f_input', obj.ForcingBuffer(:));
+            end
+            if ~isempty(obj.ErrorBuffer)
+                assignin('base', 'error', obj.ErrorBuffer(:));
+            end
+            if ~isempty(obj.EffortBuffer)
+                assignin('base', 'control_effort', obj.EffortBuffer(:));
+            end
+            obj.promoteNamed('cart2_position', 'Cart2-Position');
+            obj.promoteNamed('cart1_velocity', 'Cart1-Velocity');
+            obj.promoteNamed('cart2_velocity', 'Cart2-Velocity');
+        end
+
+        function promoteNamed(obj, wsName, sdiName)
+            [~, yWs] = obj.readWorkspaceNamed(wsName);
+            [~, ySdi] = obj.readSdiNamed(sdiName);
+            y = yWs;
+            if numel(ySdi) > numel(y)
+                y = ySdi;
+            end
+            if isempty(y)
+                return;
+            end
+            assignin('base', wsName, y(:));
+        end
+
         function captureLiveCart1Chunk(obj)
             [t, y] = obj.readWorkspaceCart1();
             obj.appendLiveChunk(t, y);
@@ -436,8 +578,7 @@ classdef AppModel < handle
             t = [];
             y = [];
             try
-                runObj = Simulink.sdi.getCurrentSimulationRun( ...
-                    char(obj.SimulationModelName));
+                runObj = obj.currentSdiRun();
                 if isempty(runObj)
                     return;
                 end
@@ -459,6 +600,26 @@ classdef AppModel < handle
                 if ~isempty(hit)
                     [t, y] = AppModel.signalValuesToXY(sigs(hit).Values);
                 end
+            catch
+            end
+        end
+
+        function runObj = currentSdiRun(obj)
+            runObj = [];
+            try
+                runObj = Simulink.sdi.getCurrentSimulationRun( ...
+                    char(obj.SimulationModelName));
+            catch
+            end
+            if ~isempty(runObj)
+                return;
+            end
+            try
+                runIDs = Simulink.sdi.getAllRunIDs();
+                if isempty(runIDs)
+                    return;
+                end
+                runObj = Simulink.sdi.getRun(runIDs(end));
             catch
             end
         end
@@ -488,10 +649,12 @@ classdef AppModel < handle
             % Workspace/SDI still hold the previous run's last buffer, whose
             % timestamps are near the old StopTime. If we accept that as the
             % start of this run, new samples at t≈0 are dropped until they
-            % catch up. Wait for a buffer that starts near t=0.
+            % catch up. Wait for a buffer that starts near t=0. After the
+            % kernel has stopped, accept the leftover packet so we do not
+            % discard the only data that arrived.
             if ~armed
                 maxStart = max(1.0, 4 * obj.LiveBufferSamples * obj.T);
-                if t(1) <= maxStart
+                if t(1) <= maxStart || obj.LiveAcceptLate
                     armed = true;
                     timeBuf = t;
                     yBuf = y;
