@@ -88,6 +88,11 @@ classdef TimePanel < handle
             obj.OverlayLineHandle.Visible = 'off';
             obj.ResponsePlot.YAxis(2).Visible = 'off';
             yyaxis(obj.ResponsePlot, 'left');
+            try
+                disableDefaultInteractivity(obj.ResponsePlot);
+                disableDefaultInteractivity(obj.ReferencePlot);
+            catch
+            end
 
             title(obj.ResponsePlot, "Response Plot", "FontWeight", "bold", "FontSize", 17);
             title(obj.ReferencePlot, "Reference Plot", "FontWeight", "bold", "FontSize", 17);
@@ -112,13 +117,15 @@ classdef TimePanel < handle
             end
             set(obj.RefLineHandle, 'XData', t, 'YData', y);
             obj.SimDuration = max(0.1, t(end));
-            xlim(obj.ReferencePlot, [0, obj.SimDuration]);
+            obj.setXLimIfChanged(obj.ReferencePlot, [0, obj.SimDuration]);
             obj.applyResponseXLim();
             obj.applyOverlay();
         end
 
         function updateResponsePlot(obj, t, y)
-            yyaxis(obj.ResponsePlot, 'left');
+            if ~isvalid(obj.RespLineHandle)
+                return;
+            end
             if isempty(t) || isempty(y)
                 set(obj.RespLineHandle, 'XData', NaN, 'YData', NaN);
                 obj.applyResponseXLim();
@@ -131,15 +138,16 @@ classdef TimePanel < handle
 
     methods (Access = private)
         function applyResponseYLim(obj)
-            yyaxis(obj.ResponsePlot, 'left');
             if obj.YLimCheckBox.Value
-                ylim(obj.ResponsePlot, obj.ResponseYLimits);
+                obj.ResponsePlot.YAxis(1).Limits = obj.ResponseYLimits;
             else
-                ylim(obj.ResponsePlot, 'auto');
+                obj.ResponsePlot.YAxis(1).LimitsMode = 'auto';
             end
         end
         function applyOverlay(obj)
-            yyaxis(obj.ResponsePlot, 'right');
+            if ~isvalid(obj.OverlayLineHandle)
+                return;
+            end
             if obj.OverlayCheckBox.Value
                 t = obj.RefLineHandle.XData;
                 y = obj.RefLineHandle.YData;
@@ -149,12 +157,11 @@ classdef TimePanel < handle
                 set(obj.OverlayLineHandle, 'Visible', 'off');
                 obj.ResponsePlot.YAxis(2).Visible = 'off';
             end
-            yyaxis(obj.ResponsePlot, 'left');
             obj.applyResponseXLim();
         end
         function applyResponseXLim(obj, t)
             if obj.AutoscaleCheckBox.Value
-                xlim(obj.ResponsePlot, [0, obj.SimDuration]);
+                obj.setXLimIfChanged(obj.ResponsePlot, [0, obj.SimDuration]);
                 return;
             end
 
@@ -166,7 +173,15 @@ classdef TimePanel < handle
             else
                 xEnd = max(0.1, t(end));
             end
-            xlim(obj.ResponsePlot, [0, xEnd]);
+            obj.setXLimIfChanged(obj.ResponsePlot, [0, xEnd]);
+        end
+
+        function setXLimIfChanged(~, ax, newLim)
+            cur = ax.XLim;
+            if abs(cur(1) - newLim(1)) < 1e-9 && abs(cur(2) - newLim(2)) < 1e-9
+                return;
+            end
+            ax.XLim = newLim;
         end
     end
 end

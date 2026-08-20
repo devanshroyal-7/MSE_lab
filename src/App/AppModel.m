@@ -261,9 +261,10 @@ classdef AppModel < handle
         end
 
         function stopSimulation(obj)
-            if bdIsLoaded(obj.SimulationModelName)
-                set_param(obj.SimulationModelName, 'SimulationCommand', 'stop');
-            end
+            % Same teardown as Ctrl+C in the Command Window: halt the
+            % kernel task, then drop the external-mode connection.
+            obj.stopTargetQuietly();
+            obj.disconnectTargetQuietly();
         end
 
         function run = collectRunData(obj)
@@ -320,6 +321,17 @@ classdef AppModel < handle
                 if ~strcmp(get_param(modelName, 'SimulationStatus'), 'stopped')
                     set_param(modelName, 'SimulationCommand', 'stop');
                 end
+            catch
+            end
+        end
+
+        function disconnectTargetQuietly(obj)
+            modelName = char(obj.SimulationModelName);
+            if ~bdIsLoaded(modelName)
+                return;
+            end
+            try
+                set_param(modelName, 'SimulationCommand', 'disconnect');
             catch
             end
         end
