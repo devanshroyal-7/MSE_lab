@@ -49,13 +49,14 @@ classdef SidebarPanel < handle
         fwdEnableControlsCallback
         fwdSimParamsChangedCallback
         fwdControlParamsChangedCallback
+        fwdAverageRunsChangedCallback
     end
 
     methods
         function obj = SidebarPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [19, 4]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [20, 4]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x', '1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
 
             %%% Real-time Simulation Controls %%%
             SimControlLabel = uilabel(obj.MainLayoutGrid, ...
@@ -149,9 +150,11 @@ classdef SidebarPanel < handle
                 "Title", "Average Runs", ...
                 "FontWeight", "bold");
             AverageRunsPanel.Layout.Column = [1, 4];
-            AverageRunsPanel.Layout.Row = [8, 10];
+            AverageRunsPanel.Layout.Row = [8, 11];
 
-            AverageRunsGrid = uigridlayout(AverageRunsPanel, [2, 2]);
+            AverageRunsGrid = uigridlayout(AverageRunsPanel, [3, 2]);
+            AverageRunsGrid.ColumnWidth = {'fit', '1x'};
+            AverageRunsGrid.RowHeight = {22, 28, '1x'};
 
             RunsToAverageLabel = uilabel(AverageRunsGrid, ...
                 "Text", "Runs to Average");
@@ -180,12 +183,20 @@ classdef SidebarPanel < handle
             obj.EnableAverageRunsButton.Layout.Column = 2;
             obj.EnableAverageRunsButton.Layout.Row = 2;
 
+            AveragingHelp = uilabel(AverageRunsGrid, ...
+                "Text", "*Splits forcing function signal into # of Averages segments and outputs each segment individually. Coherence is shown only when averaging is enabled.", ...
+                "WordWrap", "on", ...
+                "FontSize", 11, ...
+                "FontAngle", "italic");
+            AveragingHelp.Layout.Column = [1, 2];
+            AveragingHelp.Layout.Row = 3;
+
             %%% Control Parameters %%%
             obj.ControlParamPanel = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Control Parameters", ...
                 "FontWeight", "bold");
             obj.ControlParamPanel.Layout.Column = [1, 4];
-            obj.ControlParamPanel.Layout.Row = [11, 15];
+            obj.ControlParamPanel.Layout.Row = [12, 16];
 
             ControlParamGrid = uigridlayout(obj.ControlParamPanel, [4, 2]);
 
@@ -242,7 +253,7 @@ classdef SidebarPanel < handle
                 "Title", "Control Mode", ...
                 "FontWeight", "bold");
             obj.ControlModePanel.Layout.Column = [1, 4];
-            obj.ControlModePanel.Layout.Row = [16, 17];
+            obj.ControlModePanel.Layout.Row = [17, 18];
 
             ControlModeGrid = uigridlayout(obj.ControlModePanel, [1, 1]);
 
@@ -271,14 +282,14 @@ classdef SidebarPanel < handle
                 "Text","Create Forcing Function", ...
                 "ButtonPushedFcn", @(src, event) obj.createFcnCallback());
             obj.CreateFcnButton.Layout.Column = [1, 2];
-            obj.CreateFcnButton.Layout.Row = 19;
+            obj.CreateFcnButton.Layout.Row = 20;
 
             %%% Save Output Button %%%
             obj.SaveOutputButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Save Outputs", ...
                 "ButtonPushedFcn", @(src, event) obj.saveOutputCallback());
             obj.SaveOutputButton.Layout.Column = [3, 4];
-            obj.SaveOutputButton.Layout.Row = 19;
+            obj.SaveOutputButton.Layout.Row = 20;
         end
 
         function enableSimParamCallback(obj, event)
@@ -311,6 +322,17 @@ classdef SidebarPanel < handle
                 obj.EnableAverageRunsButton.Text = "DISABLED";
                 obj.EnableAverageRunsButton.BackgroundColor = "red";
             end
+            if ~isempty(obj.fwdAverageRunsChangedCallback)
+                obj.fwdAverageRunsChangedCallback(logical(state));
+            end
+        end
+
+        function n = runsToAverage(obj)
+            n = max(1, round(obj.RunsToAverageEditField.Value));
+        end
+
+        function tf = averageRunsEnabled(obj)
+            tf = logical(obj.EnableAverageRunsButton.Value);
         end
 
         function enableControlCallback(obj, event)
@@ -383,8 +405,8 @@ classdef SidebarPanel < handle
         function setControlPanelsVisible(obj, showParams, showMode)
             obj.ControlParamPanel.Visible = obj.onOff(showParams);
             obj.ControlModePanel.Visible = obj.onOff(showMode);
-            obj.setRowsHeight(11:15, showParams);
-            obj.setRowsHeight(16:17, showMode);
+            obj.setRowsHeight(12:16, showParams);
+            obj.setRowsHeight(17:18, showMode);
         end
 
         function setActionButtonsEnabled(obj, tf)

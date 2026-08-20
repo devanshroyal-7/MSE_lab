@@ -1,7 +1,7 @@
 classdef FrfAnalyzer
     % Input/output FRF and coherence. compute() aligns two time series,
-    % forms H = X/F from full-record FFTs, and estimates ordinary coherence
-    % with Welch averaging so a single run is not trivially gamma^2 = 1.
+    % forms H = X/F from full-record FFTs. Ordinary coherence is optional
+    % (Welch) and is only computed when averaging is enabled.
     %
     %{
     Example usage:
@@ -13,7 +13,7 @@ classdef FrfAnalyzer
     %}
 
     methods (Static)
-        function result = compute(tF, f, tX, x)
+        function result = compute(tF, f, tX, x, computeCoherence)
             result = FrfAnalyzer.emptyResult();
             [t, u, y] = FrfAnalyzer.alignPair(tF, f, tX, x);
             if numel(t) < 4
@@ -49,8 +49,12 @@ classdef FrfAnalyzer
             result.complex = H;
             result.mag = abs(H);
             result.phase = FrfAnalyzer.wrapPhaseDeg(rad2deg(angle(H)));
-            result.coherence = FrfAnalyzer.welchCoherence(t, u, y, result.freq);
-            result.coherence(isnan(H)) = NaN;
+            if nargin >= 5 && logical(computeCoherence)
+                result.coherence = FrfAnalyzer.welchCoherence(t, u, y, result.freq);
+                result.coherence(isnan(H)) = NaN;
+            else
+                result.coherence = NaN(size(result.freq));
+            end
             result.xLim = FftAnalyzer.displayXLim();
         end
 

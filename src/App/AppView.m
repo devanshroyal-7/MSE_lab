@@ -39,6 +39,7 @@ classdef AppView < handle
         fwdEnableControlsCallbackView
         fwdSimParamsChangedCallbackView
         fwdControlParamsChangedCallbackView
+        fwdAverageRunsChangedCallbackView
     end
 
     methods
@@ -102,6 +103,7 @@ classdef AppView < handle
             obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
             obj.Sidebar.fwdSimParamsChangedCallback = @(k, b, enabled) obj.handleSimParamsChangedCallback(k, b, enabled);
             obj.Sidebar.fwdControlParamsChangedCallback = @(kp, ki, kd, closedLoop, enabled) obj.handleControlParamsChangedCallback(kp, ki, kd, closedLoop, enabled);
+            obj.Sidebar.fwdAverageRunsChangedCallback = @(enabled) obj.handleAverageRunsChangedCallback(enabled);
             obj.TabGroup.SelectionChangedFcn = @(src, event) obj.handleTabChanged();
             obj.handleTabChanged();
         end
@@ -133,6 +135,10 @@ classdef AppView < handle
 
         function tf = controlsEnabled(obj)
             tf = obj.Sidebar.controlsEnabled();
+        end
+
+        function tf = averageRunsEnabled(obj)
+            tf = obj.Sidebar.averageRunsEnabled();
         end
 
         function updateResponsePlot(obj, t, y)
@@ -214,12 +220,20 @@ classdef AppView < handle
             obj.FFTPanel.updateResponse(FftAnalyzer.emptySpectrum());
         end
 
-        function updateFrf(obj, result)
-            obj.FRFPanel.update(result);
+        function updateFrf(obj, result, showCoherence)
+            if nargin < 3
+                showCoherence = false;
+            end
+            obj.FRFPanel.update(result, showCoherence);
         end
 
         function clearFrf(obj)
             obj.FRFPanel.clearPlots();
+            obj.FRFPanel.setCoherenceVisible(false);
+        end
+
+        function clearFrfCoherence(obj)
+            obj.FRFPanel.clearCoherence();
         end
 
         function updateControlsBode(obj, spec)
@@ -280,6 +294,12 @@ classdef AppView < handle
         function handleControlParamsChangedCallback(obj, kp, ki, kd, closedLoop, enabled)
             if ~isempty(obj.fwdControlParamsChangedCallbackView)
                 obj.fwdControlParamsChangedCallbackView(kp, ki, kd, closedLoop, enabled);
+            end
+        end
+
+        function handleAverageRunsChangedCallback(obj, enabled)
+            if ~isempty(obj.fwdAverageRunsChangedCallbackView)
+                obj.fwdAverageRunsChangedCallbackView(enabled);
             end
         end
 

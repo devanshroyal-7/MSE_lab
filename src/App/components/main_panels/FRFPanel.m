@@ -60,11 +60,17 @@ classdef FRFPanel < handle
             obj.MagLine = plot(obj.AxMag, NaN, NaN, 'b-', LineWidth=1.5);
             obj.PhaseLine = plot(obj.AxPhase, NaN, NaN, 'b-', LineWidth=1.5);
             obj.CoherenceLine = plot(obj.AxCoherence, NaN, NaN, 'b-', LineWidth=1.5);
+            obj.setCoherenceVisible(false);
         end
 
-        function update(obj, result)
+        function update(obj, result, showCoherence)
+            if nargin < 3
+                showCoherence = false;
+            end
+            obj.setCoherenceVisible(showCoherence);
             if nargin < 2 || isempty(result) || result.n == 0 || isempty(result.freq)
                 obj.clearPlots();
+                obj.setCoherenceVisible(showCoherence);
                 return;
             end
             mag = result.mag;
@@ -76,7 +82,11 @@ classdef FRFPanel < handle
 
             set(obj.MagLine, 'XData', result.freq, 'YData', mag);
             set(obj.PhaseLine, 'XData', result.freq, 'YData', phase);
-            set(obj.CoherenceLine, 'XData', result.freq, 'YData', coh);
+            if showCoherence
+                set(obj.CoherenceLine, 'XData', result.freq, 'YData', coh);
+            else
+                set(obj.CoherenceLine, 'XData', NaN, 'YData', NaN);
+            end
 
             if isfield(result, 'xLim') && numel(result.xLim) == 2 && result.xLim(2) > result.xLim(1)
                 xLim = result.xLim;
@@ -98,7 +108,9 @@ classdef FRFPanel < handle
                 ylim(obj.AxMag, [0, yTop * 1.1]);
             end
             ylim(obj.AxPhase, [-180, 180]);
-            ylim(obj.AxCoherence, [0, 1]);
+            if showCoherence
+                ylim(obj.AxCoherence, [0, 1]);
+            end
         end
 
         function clearPlots(obj)
@@ -109,6 +121,22 @@ classdef FRFPanel < handle
             xlim(obj.AxMag, xLim);
             xlim(obj.AxPhase, xLim);
             xlim(obj.AxCoherence, xLim);
+        end
+
+        function clearCoherence(obj)
+            set(obj.CoherenceLine, 'XData', NaN, 'YData', NaN);
+            obj.setCoherenceVisible(false);
+        end
+
+        function setCoherenceVisible(obj, tf)
+            if tf
+                vis = 'on';
+                obj.MainLayoutGrid.RowHeight = {'1x', '1x', '1x'};
+            else
+                vis = 'off';
+                obj.MainLayoutGrid.RowHeight = {'1x', '1x', 0};
+            end
+            obj.AxCoherence.Visible = vis;
         end
     end
 end

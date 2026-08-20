@@ -40,6 +40,7 @@ classdef AppController < handle
             obj.View.fwdEnableControlsCallbackView = @(enabled) obj.handleEnableControlsCallback(enabled);
             obj.View.fwdSimParamsChangedCallbackView = @(k, b, enabled) obj.handleSimParamsChangedCallback(k, b, enabled);
             obj.View.fwdControlParamsChangedCallbackView = @(kp, ki, kd, closedLoop, enabled) obj.handleControlParamsChangedCallback(kp, ki, kd, closedLoop, enabled);
+            obj.View.fwdAverageRunsChangedCallbackView = @(enabled) obj.handleAverageRunsChangedCallback(enabled);
         end
 
         function handleRunSimCallback(obj)
@@ -200,6 +201,12 @@ classdef AppController < handle
             obj.Model.setControlParameters(kp, ki, kd, closedLoop, enabled);
         end
 
+        function handleAverageRunsChangedCallback(obj, enabled)
+            if ~enabled
+                obj.View.clearFrfCoherence();
+            end
+        end
+
         function handleSaveOutputCallback(obj)
             [file, path] = uiputfile('*.mat', 'Save run data');
             if isequal(file, 0)
@@ -292,8 +299,9 @@ classdef AppController < handle
         function plotFrf(obj)
             [tF, f] = obj.Model.getLoggedForcing();
             [tX, x] = obj.Model.getLoggedResponse();
-            result = FrfAnalyzer.compute(tF, f, tX, x);
-            obj.View.updateFrf(result);
+            showCoherence = obj.View.averageRunsEnabled();
+            result = FrfAnalyzer.compute(tF, f, tX, x, showCoherence);
+            obj.View.updateFrf(result, showCoherence);
         end
 
         function spec = fftFromTimeseries(~, ts)
