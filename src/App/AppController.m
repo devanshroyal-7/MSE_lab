@@ -56,6 +56,7 @@ classdef AppController < handle
 
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
+            obj.Model.prepareNewRun();
             obj.View.updateResponsePlot([], []);
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();

@@ -64,9 +64,13 @@ classdef AppModel < handle
         LiveArmedError (1,1) logical = false
         LiveArmedEffort (1,1) logical = false
         LiveAcceptLate (1,1) logical = false
+        LiveCaptureEnabled (1,1) logical = false
         StaleSdiRunId = []
+        StaleSdiRunIds = []
         StaleSdiFingerprint = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN)
+        StaleLogFingerprint = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN)
         SdiFreshForThisRun (1,1) logical = false
+        AuxLogs = struct()
     end
 
     events 
@@ -88,6 +92,7 @@ classdef AppModel < handle
             assignin('base', "motor_eff", obj.motor_eff);
             obj.applySimParamsToWorkspace();
             obj.applyControlParamsToWorkspace();
+            obj.initAuxLogs();
         end
 
         function setSimulatedParameters(obj, k, b, enabled)
@@ -219,27 +224,35 @@ classdef AppModel < handle
         end
 
         function [t, y] = getLiveCart1Position(obj)
-            obj.captureLiveCart1Chunk();
+            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
+                obj.captureLiveCart1Chunk();
+            end
             t = obj.TimeBuffer(:);
             y = AppModel.metersToMm(obj.PositionBuffer(:));
         end
 
         function [t, y] = getLiveFInput(obj)
-            obj.captureLiveFInputChunk();
+            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
+                obj.captureLiveFInputChunk();
+            end
             t = obj.ForcingTimeBuffer(:);
             y = obj.ForcingBuffer(:);
         end
 
         function [t, y] = getLiveError(obj)
-            obj.captureLiveNamedChunk('error', 'error', ...
-                'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
+            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
+                obj.captureLiveNamedChunk('error', 'error', ...
+                    'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
+            end
             t = obj.ErrorTimeBuffer(:);
             y = AppModel.metersToMm(obj.ErrorBuffer(:));
         end
 
         function [t, y] = getLiveControlEffort(obj)
-            obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
-                'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
+            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
+                obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
+                    'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
+            end
             t = obj.EffortTimeBuffer(:);
             y = obj.EffortBuffer(:);
         end
@@ -263,9 +276,14 @@ classdef AppModel < handle
             set_param(modelName, 'SimulationCommand', 'connect');
         end
 
-        function startSimulation(obj)
-            obj.applySimParamsToWorkspace();
-            obj.applyControlParamsToWorkspace();
+        function resetLiveLog(obj)
+            % Drop the previous experiment so Start always replaces the
+            % trace. A leftover 0..S series would otherwise re-arm and
+            % ignore (or append past) the new run.
+            if ~isempty(obj.PositionBuffer)
+                obj.StaleLogFingerprint = obj.makeSdiFingerprint( ...
+                    [], obj.TimeBuffer, obj.PositionBuffer);
+            end
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
@@ -280,9 +298,22 @@ classdef AppModel < handle
             obj.LiveArmedError = false;
             obj.LiveArmedEffort = false;
             obj.LiveAcceptLate = false;
+            obj.LiveCaptureEnabled = false;
             obj.SdiFreshForThisRun = false;
+            obj.initAuxLogs();
             obj.clearLoggedWorkspace();
+        end
+
+        function prepareNewRun(obj)
+            obj.resetLiveLog();
             obj.snapshotStaleSdi();
+        end
+
+        function startSimulation(obj)
+            obj.applySimParamsToWorkspace();
+            obj.applyControlParamsToWorkspace();
+            obj.resetLiveLog();
+            obj.LiveCaptureEnabled = true;
 
             obj.ensureExternalMode();
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
@@ -310,12 +341,16 @@ classdef AppModel < handle
             % Pull the latest ExtMode / SDI packets into the stitched
             % buffers. Must run at least as often as ExtMode Duration or
             % workspace-only dumps drop every other packet.
+            if ~obj.LiveCaptureEnabled && ~obj.LiveAcceptLate
+                return;
+            end
             obj.captureLiveCart1Chunk();
             obj.captureLiveFInputChunk();
             obj.captureLiveNamedChunk('error', 'error', ...
                 'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
             obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
                 'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
+            obj.captureAuxLogs();
         end
 
         function dt = livePollPeriod(obj)
@@ -333,6 +368,7 @@ classdef AppModel < handle
             obj.adoptAllRicherLogs();
             obj.promoteLoggedSignalsToWorkspace();
             obj.LiveAcceptLate = false;
+            obj.LiveCaptureEnabled = false;
         end
 
         function run = collectRunData(obj)
@@ -342,6 +378,7 @@ classdef AppModel < handle
                 "rt_time", "f_input", "error", "control_effort", ...
                 "cart1_position", "cart2_position", ...
                 "cart1_velocity", "cart2_velocity", ...
+                "motor_current", "motor_velocity", ...
                 "sim_input", "k_sim", "b_sim", ...
                 "Kp", "Ki", "Kd", "K_switch", ...
                 "T", "r", "Kt", "motor_eff"];
@@ -440,8 +477,8 @@ classdef AppModel < handle
             if isempty(obj.TimeBuffer)
                 return;
             end
-            nOk = numel(obj.TimeBuffer) >= 0.90 * obj.expectedSampleCount();
-            tOk = obj.TimeBuffer(end) >= 0.90 * obj.S;
+            nOk = numel(obj.TimeBuffer) >= obj.expectedSampleCount() - obj.LiveBufferSamples;
+            tOk = obj.TimeBuffer(end) >= obj.S - obj.LiveBufferSamples * obj.T;
             tf = nOk && tOk;
         end
 
@@ -454,6 +491,7 @@ classdef AppModel < handle
                 'error', 'error');
             obj.adoptRicherLog('EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort', ...
                 'control_effort', 'control_effort');
+            obj.adoptAuxRicherLogs();
         end
 
         function adoptRicherLog(obj, tField, yField, armedField, wsName, sdiName)
@@ -482,15 +520,18 @@ classdef AppModel < handle
                 end
                 ti = ti(1:n);
                 yi = yi(1:n);
+                if ~obj.looksLikeThisRun(ti, yi)
+                    continue;
+                end
                 tSpan = ti(end) - ti(1);
                 score = n + 1e6 * max(tSpan, 0);
                 if ti(1) <= max(0.5, 0.1 * obj.S)
                     score = score + 1e9;
                 end
-                if n >= 0.90 * obj.expectedSampleCount()
+                if n >= 0.98 * obj.expectedSampleCount()
                     score = score + 1e8;
                 end
-                if ti(end) >= 0.90 * obj.S
+                if ti(end) >= 0.98 * obj.S
                     score = score + 1e7;
                 end
                 if score > bestScore
@@ -525,9 +566,7 @@ classdef AppModel < handle
             if ~isempty(obj.EffortBuffer)
                 assignin('base', 'control_effort', obj.EffortBuffer(:));
             end
-            obj.promoteNamed('cart2_position', 'Cart2-Position');
-            obj.promoteNamed('cart1_velocity', 'Cart1-Velocity');
-            obj.promoteNamed('cart2_velocity', 'Cart2-Velocity');
+            obj.promoteAuxLogs();
         end
 
         function harmonizeStitchedLogs(obj)
@@ -589,17 +628,137 @@ classdef AppModel < handle
             y = y(keep);
         end
 
-        function promoteNamed(obj, wsName, sdiName)
-            [~, yWs] = obj.readWorkspaceNamed(wsName);
-            [~, ySdi] = obj.readSdiNamed(sdiName);
-            y = yWs;
-            if numel(ySdi) > numel(y)
-                y = ySdi;
+        function promoteAuxLogs(obj)
+            tClock = obj.TimeBuffer(:);
+            names = obj.auxLogNames();
+            for i = 1:numel(names)
+                wsName = names{i};
+                log = obj.AuxLogs.(wsName);
+                y = [];
+                if ~isempty(log.y) && ~isempty(log.t) ...
+                        && (log.t(end) - log.t(1)) >= 0.8 * obj.S
+                    y = obj.resampleOntoClock(log.t, log.y, tClock);
+                end
+                if numel(y) ~= numel(tClock)
+                    [tWs, yWs] = obj.readWorkspaceNamed(wsName);
+                    if numel(yWs) == numel(tClock)
+                        y = yWs(:);
+                    elseif ~isempty(tWs) && ~isempty(yWs) ...
+                            && (tWs(end) - tWs(1)) >= 0.8 * obj.S
+                        y = obj.resampleOntoClock(tWs, yWs, tClock);
+                    end
+                end
+                if numel(y) ~= numel(tClock)
+                    [tSdi, ySdi] = obj.readSdiNamed(obj.auxSdiName(wsName));
+                    if numel(ySdi) == numel(tClock)
+                        y = ySdi(:);
+                    elseif ~isempty(tSdi) && ~isempty(ySdi) ...
+                            && (tSdi(end) - tSdi(1)) >= 0.8 * obj.S
+                        y = obj.resampleOntoClock(tSdi, ySdi, tClock);
+                    end
+                end
+                if numel(y) == numel(tClock) && ~isempty(y)
+                    assignin('base', wsName, y(:));
+                end
             end
-            if isempty(y)
-                return;
+        end
+
+        function initAuxLogs(obj)
+            names = obj.auxLogNames();
+            logs = struct();
+            for i = 1:numel(names)
+                logs.(names{i}) = struct('t', [], 'y', [], 'armed', false);
             end
-            assignin('base', wsName, y(:));
+            obj.AuxLogs = logs;
+        end
+
+        function names = auxLogNames(~)
+            names = { ...
+                'cart2_position', 'cart1_velocity', 'cart2_velocity', ...
+                'motor_current', 'motor_velocity'};
+        end
+
+        function sdiName = auxSdiName(~, wsName)
+            switch wsName
+                case 'cart2_position'
+                    sdiName = 'Cart2-Position';
+                case 'cart1_velocity'
+                    sdiName = 'Cart1-Velocity';
+                case 'cart2_velocity'
+                    sdiName = 'Cart2-Velocity';
+                otherwise
+                    sdiName = wsName;
+            end
+        end
+
+        function captureAuxLogs(obj)
+            names = obj.auxLogNames();
+            for i = 1:numel(names)
+                wsName = names{i};
+                log = obj.AuxLogs.(wsName);
+                [t, y] = obj.readWorkspaceNamed(wsName);
+                [log.t, log.y, log.armed] = obj.appendLiveSamples( ...
+                    log.t, log.y, log.armed, t, y);
+                if obj.LiveAcceptLate
+                    [t, y] = obj.readSdiNamed(obj.auxSdiName(wsName));
+                    [log.t, log.y, log.armed] = obj.appendLiveSamples( ...
+                        log.t, log.y, log.armed, t, y);
+                end
+                obj.AuxLogs.(wsName) = log;
+            end
+        end
+
+        function adoptAuxRicherLogs(obj)
+            names = obj.auxLogNames();
+            for i = 1:numel(names)
+                wsName = names{i};
+                log = obj.AuxLogs.(wsName);
+                log = obj.adoptRicherLogInto(log, wsName, obj.auxSdiName(wsName));
+                obj.AuxLogs.(wsName) = log;
+            end
+        end
+
+        function log = adoptRicherLogInto(obj, log, wsName, sdiName)
+            candidates = {};
+            if ~isempty(log.y)
+                candidates{end+1} = {log.t(:), log.y(:)}; %#ok<AGROW>
+            end
+            [t, y] = obj.readWorkspaceNamed(wsName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
+            end
+            [t, y] = obj.readSdiNamed(sdiName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
+            end
+            bestT = [];
+            bestY = [];
+            bestScore = -1;
+            for i = 1:numel(candidates)
+                ti = candidates{i}{1};
+                yi = candidates{i}{2};
+                n = min(numel(ti), numel(yi));
+                if n < 2
+                    continue;
+                end
+                ti = ti(1:n);
+                yi = yi(1:n);
+                if ~obj.looksLikeThisRun(ti, yi)
+                    continue;
+                end
+                tSpan = ti(end) - ti(1);
+                score = n + 1e6 * max(tSpan, 0);
+                if score > bestScore
+                    bestScore = score;
+                    bestT = ti;
+                    bestY = yi;
+                end
+            end
+            if ~isempty(bestY)
+                log.t = bestT(:)';
+                log.y = bestY(:)';
+                log.armed = true;
+            end
         end
 
         function captureLiveCart1Chunk(obj)
@@ -675,12 +834,21 @@ classdef AppModel < handle
             end
         end
 
-        function clearLoggedWorkspace(~)
+        function names = workspaceLogNames(~)
             names = { ...
                 'rt_time', 'f_input', 'error', 'control_effort', ...
                 'cart1_position', 'cart2_position', ...
-                'cart1_velocity', 'cart2_velocity'};
+                'cart1_velocity', 'cart2_velocity', ...
+                'motor_current', 'motor_velocity'};
+        end
+
+        function clearLoggedWorkspace(obj)
+            names = obj.workspaceLogNames();
             for i = 1:numel(names)
+                try
+                    assignin('base', names{i}, []);
+                catch
+                end
                 try
                     evalin('base', ['clear ' names{i}]);
                 catch
@@ -703,9 +871,43 @@ classdef AppModel < handle
             end
         end
 
+        function id = currentSdiRunIdUnfiltered(obj)
+            id = [];
+            try
+                runObj = obj.currentSdiRunUnfiltered();
+                if ~isempty(runObj)
+                    id = runObj.id;
+                end
+            catch
+            end
+        end
+
+        function ids = allSdiRunIds(~)
+            ids = [];
+            try
+                ids = Simulink.sdi.getAllRunIDs();
+            catch
+            end
+        end
+
+        function tf = isStaleSdiId(obj, id)
+            tf = false;
+            if isempty(id)
+                return;
+            end
+            if ~isempty(obj.StaleSdiRunId) && isequal(id, obj.StaleSdiRunId)
+                tf = true;
+                return;
+            end
+            if ~isempty(obj.StaleSdiRunIds)
+                tf = ismember(id, obj.StaleSdiRunIds);
+            end
+        end
+
         function snapshotStaleSdi(obj)
-            obj.StaleSdiRunId = obj.currentSdiRunId();
-            [t, y, runObj] = obj.fetchSdiNamed('Cart1-Position');
+            obj.StaleSdiRunId = obj.currentSdiRunIdUnfiltered();
+            obj.StaleSdiRunIds = obj.allSdiRunIds();
+            [t, y, runObj] = obj.fetchSdiNamedUnfiltered('Cart1-Position');
             obj.StaleSdiFingerprint = obj.makeSdiFingerprint(runObj, t, y);
         end
 
@@ -722,6 +924,20 @@ classdef AppModel < handle
             obj.SdiFreshForThisRun = true;
             t = tRaw;
             y = yRaw;
+        end
+
+        function [t, y, runObj] = fetchSdiNamedUnfiltered(obj, nameFragment)
+            t = [];
+            y = [];
+            runObj = [];
+            try
+                runObj = obj.currentSdiRunUnfiltered();
+                if isempty(runObj)
+                    return;
+                end
+                [t, y] = obj.sdiSignalXY(runObj, nameFragment);
+            catch
+            end
         end
 
         function [t, y, runObj] = fetchSdiNamed(obj, nameFragment)
@@ -808,21 +1024,17 @@ classdef AppModel < handle
         end
 
         function tf = sdiRecordIsStale(obj, runObj, t, y)
+            tf = true;
+            if isempty(runObj)
+                return;
+            end
+            if obj.isStaleSdiId(runObj.id)
+                return;
+            end
+            if obj.matchesStaleLog(t, y)
+                return;
+            end
             tf = false;
-            if obj.SdiFreshForThisRun || isempty(y)
-                return;
-            end
-            fp = obj.StaleSdiFingerprint;
-            if isempty(fp) || fp.n <= 0
-                return;
-            end
-            if ~isempty(obj.StaleSdiRunId) && ~isempty(runObj) ...
-                    && ~isequal(runObj.id, obj.StaleSdiRunId)
-                return;
-            end
-            tf = numel(y) == fp.n ...
-                && isequaln(y(end), fp.yEnd) ...
-                && (isempty(t) || isequaln(t(end), fp.tEnd));
         end
 
         function fp = makeSdiFingerprint(~, runObj, t, y)
@@ -842,6 +1054,27 @@ classdef AppModel < handle
 
         function runObj = currentSdiRun(obj)
             runObj = [];
+            cand = obj.currentSdiRunUnfiltered();
+            if ~isempty(cand) && ~obj.isStaleSdiId(cand.id)
+                runObj = cand;
+                return;
+            end
+            ids = obj.allSdiRunIds();
+            for i = numel(ids):-1:1
+                if obj.isStaleSdiId(ids(i))
+                    continue;
+                end
+                try
+                    runObj = Simulink.sdi.getRun(ids(i));
+                catch
+                    runObj = [];
+                end
+                return;
+            end
+        end
+
+        function runObj = currentSdiRunUnfiltered(obj)
+            runObj = [];
             try
                 runObj = Simulink.sdi.getCurrentSimulationRun( ...
                     char(obj.SimulationModelName));
@@ -851,7 +1084,7 @@ classdef AppModel < handle
                 return;
             end
             try
-                runIDs = Simulink.sdi.getAllRunIDs();
+                runIDs = obj.allSdiRunIds();
                 if isempty(runIDs)
                     return;
                 end
@@ -881,16 +1114,23 @@ classdef AppModel < handle
             n = min(numel(t), numel(y));
             t = t(1:n);
             y = y(1:n);
+            if obj.matchesStaleLog(t, y) || ~obj.looksLikeThisRun(t, y)
+                return;
+            end
 
-            % Workspace/SDI still hold the previous run's last buffer, whose
-            % timestamps are near the old StopTime. If we accept that as the
-            % start of this run, new samples at t≈0 are dropped until they
-            % catch up. Wait for a buffer that starts near t=0. After the
-            % kernel has stopped, accept the leftover packet so we do not
-            % discard the only data that arrived.
+            % First packet of this run must be a short ExtMode dump near t=0.
+            % A leftover full series also starts at t=0; accepting it freezes
+            % the plot (new t <= old t(end)) or appends only past the old S.
             if ~armed
                 maxStart = max(1.0, 4 * obj.LiveBufferSamples * obj.T);
-                if t(1) <= maxStart || obj.LiveAcceptLate
+                maxFirstEnd = max(2.0, 8 * obj.LiveBufferSamples * obj.T);
+                if obj.LiveAcceptLate
+                    if t(1) <= maxStart || numel(t) <= 2 * obj.LiveBufferSamples
+                        armed = true;
+                        timeBuf = t;
+                        yBuf = y;
+                    end
+                elseif t(1) <= maxStart && t(end) <= maxFirstEnd
                     armed = true;
                     timeBuf = t;
                     yBuf = y;
@@ -898,9 +1138,6 @@ classdef AppModel < handle
                 return;
             end
 
-            % SDI often holds the full record while workspace only has the
-            % latest Duration packet. append-after-end cannot fill holes, so
-            % replace when the incoming series is a longer covering record.
             covers = t(1) <= timeBuf(1) + obj.T ...
                 && t(end) >= timeBuf(end) - obj.T;
             if covers && numel(t) > numel(timeBuf)
@@ -914,6 +1151,37 @@ classdef AppModel < handle
                 timeBuf = [timeBuf, t(mask)];
                 yBuf = [yBuf, y(mask)];
             end
+        end
+
+        function tf = looksLikeThisRun(obj, t, y)
+            tf = false;
+            if isempty(t) || isempty(y)
+                return;
+            end
+            n = min(numel(t), numel(y));
+            t = t(1:n);
+            y = y(1:n);
+            if n < 2
+                return;
+            end
+            if obj.matchesStaleLog(t, y)
+                return;
+            end
+            if t(end) > obj.S + 1.0
+                return;
+            end
+            tf = true;
+        end
+
+        function tf = matchesStaleLog(obj, t, y)
+            tf = false;
+            fp = obj.StaleLogFingerprint;
+            if isempty(fp) || fp.n <= 0 || isempty(y)
+                return;
+            end
+            tf = numel(y) == fp.n ...
+                && isequaln(y(end), fp.yEnd) ...
+                && (isempty(t) || isequaln(t(end), fp.tEnd));
         end
     end
 
