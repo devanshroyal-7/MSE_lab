@@ -48,6 +48,10 @@ classdef AppModel < handle
         VelocityBuffer  (1,:) double = [];
         ForcingTimeBuffer (1,:) double = [];
         ForcingBuffer     (1,:) double = [];
+        ErrorTimeBuffer   (1,:) double = [];
+        ErrorBuffer       (1,:) double = [];
+        EffortTimeBuffer  (1,:) double = [];
+        EffortBuffer      (1,:) double = [];
         ForcingSignal           % timeseries object from SignalBuilder
 
         % External-mode upload buffer (samples). At T=0.001 this is 0.05 s.
@@ -57,6 +61,8 @@ classdef AppModel < handle
     properties (Access = private)
         LiveArmed (1,1) logical = false
         LiveArmedForcing (1,1) logical = false
+        LiveArmedError (1,1) logical = false
+        LiveArmedEffort (1,1) logical = false
         StaleSdiRunId = []
     end
 
@@ -220,6 +226,20 @@ classdef AppModel < handle
             y = obj.ForcingBuffer(:);
         end
 
+        function [t, y] = getLiveError(obj)
+            obj.captureLiveNamedChunk('error', 'error', ...
+                'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
+            t = obj.ErrorTimeBuffer(:);
+            y = obj.ErrorBuffer(:);
+        end
+
+        function [t, y] = getLiveControlEffort(obj)
+            obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
+                'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
+            t = obj.EffortTimeBuffer(:);
+            y = obj.EffortBuffer(:);
+        end
+
         function connectTarget(obj)
             % External mode and ExtMode buffers first, then rebuild so the
             % host TARGET_DATA_MAP matches the kernel app, then connect.
@@ -247,8 +267,14 @@ classdef AppModel < handle
             obj.VelocityBuffer = [];
             obj.ForcingTimeBuffer = [];
             obj.ForcingBuffer = [];
+            obj.ErrorTimeBuffer = [];
+            obj.ErrorBuffer = [];
+            obj.EffortTimeBuffer = [];
+            obj.EffortBuffer = [];
             obj.LiveArmed = false;
             obj.LiveArmedForcing = false;
+            obj.LiveArmedError = false;
+            obj.LiveArmedEffort = false;
             obj.StaleSdiRunId = obj.currentSdiRunId();
 
             obj.ensureExternalMode();
@@ -269,7 +295,7 @@ classdef AppModel < handle
 
         function run = collectRunData(obj)
             names = [ ...
-                "rt_time", "f_input", ...
+                "rt_time", "f_input", "error", "control_effort", ...
                 "cart1_position", "cart2_position", ...
                 "cart1_velocity", "cart2_velocity", ...
                 "sim_input", "k_sim", "b_sim", ...
@@ -358,6 +384,17 @@ classdef AppModel < handle
             obj.appendLiveForcingChunk(t, y);
         end
 
+        function captureLiveNamedChunk(obj, wsName, sdiName, tField, yField, armedField)
+            [t, y] = obj.readWorkspaceNamed(wsName);
+            [obj.(tField), obj.(yField), obj.(armedField)] = ...
+                obj.appendLiveSamples(obj.(tField), obj.(yField), ...
+                obj.(armedField), t, y);
+            [t, y] = obj.readSdiNamed(sdiName);
+            [obj.(tField), obj.(yField), obj.(armedField)] = ...
+                obj.appendLiveSamples(obj.(tField), obj.(yField), ...
+                obj.(armedField), t, y);
+        end
+
         function [t, y] = readWorkspaceNamed(obj, varName)
             t = [];
             y = [];
@@ -407,12 +444,19 @@ classdef AppModel < handle
                     return;
                 end
                 sigs = runObj.getAllSignals();
+                hit = [];
                 for i = 1:numel(sigs)
                     name = char(sigs(i).Name);
-                    if contains(name, nameFragment, 'IgnoreCase', true)
-                        [t, y] = AppModel.signalValuesToXY(sigs(i).Values);
-                        return;
+                    if strcmpi(name, nameFragment)
+                        hit = i;
+                        break;
                     end
+                    if isempty(hit) && contains(name, nameFragment, 'IgnoreCase', true)
+                        hit = i;
+                    end
+                end
+                if ~isempty(hit)
+                    [t, y] = AppModel.signalValuesToXY(sigs(hit).Values);
                 end
             catch
             end

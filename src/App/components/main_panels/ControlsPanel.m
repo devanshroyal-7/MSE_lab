@@ -1,5 +1,5 @@
 classdef ControlsPanel < handle
-    % Controls-Time tab: 2x2 grid of displacement, reference input (f_input),
+    % Controls-Time tab: 2x2 grid of displacement, reference (sim_input),
     % error, and control effort. Axes are empty until the controller writes
     % traces during or after a run.
     %
@@ -70,6 +70,7 @@ classdef ControlsPanel < handle
 
         function setReferenceQuantity(obj, quantity)
             ylabel(obj.AxReferenceInput, quantity.PlotYLabel);
+            ylabel(obj.AxError, sprintf('Error (%s)', quantity.Unit));
         end
 
         function clearPlots(obj)

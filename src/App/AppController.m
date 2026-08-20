@@ -232,8 +232,15 @@ classdef AppController < handle
 
         function plotLiveResponse(obj)
             [t, y] = obj.Model.getLiveCart1Position();
-            [tf, f] = obj.Model.getLiveFInput();
-            obj.View.updateLivePlots(t, y, tf, f);
+            tab = obj.View.selectedTabTitle();
+            if tab == "Controls - Time"
+                [tRef, yRef] = obj.Model.getLoggedForcing();
+                [tErr, yErr] = obj.Model.getLiveError();
+                [tEff, yEff] = obj.Model.getLiveControlEffort();
+                obj.View.updateLiveControlsPlots(t, y, tRef, yRef, tErr, yErr, tEff, yEff);
+            else
+                obj.View.updateLivePlots(t, y);
+            end
         end
 
         function plotLoggedResponse(obj)
@@ -241,9 +248,17 @@ classdef AppController < handle
             if ~isempty(t) && ~isempty(y)
                 obj.View.updateResponsePlot(t, y);
             end
-            [tf, f] = obj.Model.getLiveFInput();
-            if ~isempty(tf) && ~isempty(f)
-                obj.View.updateControlsReferenceInput(tf, f);
+            [tRef, yRef] = obj.Model.getLoggedForcing();
+            if ~isempty(tRef) && ~isempty(yRef)
+                obj.View.updateControlsReferenceInput(tRef, yRef);
+            end
+            [tErr, yErr] = obj.Model.getLiveError();
+            if ~isempty(tErr) && ~isempty(yErr)
+                obj.View.updateControlsError(tErr, yErr);
+            end
+            [tEff, yEff] = obj.Model.getLiveControlEffort();
+            if ~isempty(tEff) && ~isempty(yEff)
+                obj.View.updateControlsEffort(tEff, yEff);
             end
         end
 

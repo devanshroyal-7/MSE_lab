@@ -110,6 +110,7 @@ classdef AppView < handle
             t = sim_input.Time;
             y = squeeze(sim_input.Data);
             obj.TimeDomainPanel.updateReferencePlot(t, y);
+            obj.ControlsPanel.updateReferenceInput(t, y);
 
             if ~isempty(sim_input.UserData) && isfield(sim_input.UserData, 'Quantity')
                 obj.setReferenceQuantity(SignalQuantity.fromMode(sim_input.UserData.Quantity));
@@ -118,6 +119,7 @@ classdef AppView < handle
 
         function clearReferencePlot(obj)
             obj.TimeDomainPanel.updateReferencePlot([], []);
+            obj.ControlsPanel.updateReferenceInput([], []);
         end
 
         function setReferenceQuantity(obj, quantity)
@@ -156,8 +158,31 @@ classdef AppView < handle
             end
         end
 
+        function updateLiveControlsPlots(obj, t, y, tRef, yRef, tErr, yErr, tEff, yEff)
+            if ~isempty(t)
+                obj.ControlsPanel.updateDisplacement(t, y);
+            end
+            if nargin >= 5 && ~isempty(tRef)
+                obj.ControlsPanel.updateReferenceInput(tRef, yRef);
+            end
+            if nargin >= 7 && ~isempty(tErr)
+                obj.ControlsPanel.updateError(tErr, yErr);
+            end
+            if nargin >= 9 && ~isempty(tEff)
+                obj.ControlsPanel.updateEffort(tEff, yEff);
+            end
+        end
+
         function updateControlsReferenceInput(obj, t, y)
             obj.ControlsPanel.updateReferenceInput(t, y);
+        end
+
+        function updateControlsError(obj, t, y)
+            obj.ControlsPanel.updateError(t, y);
+        end
+
+        function updateControlsEffort(obj, t, y)
+            obj.ControlsPanel.updateEffort(t, y);
         end
 
         function clearControlsTimePlots(obj)
