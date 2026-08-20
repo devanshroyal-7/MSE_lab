@@ -32,6 +32,12 @@ classdef AppModel < handle
         b_sim       (1,1) double = 0;   % simulated damping     [Ns/m]
         SimParamsEnabled (1,1) logical = false;
 
+        Kp (1,1) double = 1;
+        Ki (1,1) double = 0;
+        Kd (1,1) double = 0;
+        ClosedLoop (1,1) logical = false;
+        ControlsEnabled (1,1) logical = false;
+
         % Simulation control and configuration
         SimulationModelName (1,1) string = "MSE_PLANT";
         RunTimeout (1,1) double = 30;   % [s] connect/start hang cap (not run length)
@@ -72,6 +78,7 @@ classdef AppModel < handle
             assignin('base', "Kt", obj.Kt);
             assignin('base', "motor_eff", obj.motor_eff);
             obj.applySimParamsToWorkspace();
+            obj.applyControlParamsToWorkspace();
         end
 
         function setSimulatedParameters(obj, k, b, enabled)
@@ -98,6 +105,31 @@ classdef AppModel < handle
             end
         end
 
+        function setControlParameters(obj, kp, ki, kd, closedLoop, enabled)
+            obj.Kp = kp;
+            obj.Ki = ki;
+            obj.Kd = kd;
+            obj.ClosedLoop = logical(closedLoop);
+            obj.ControlsEnabled = logical(enabled);
+        end
+
+        function applyControlParamsToWorkspace(obj)
+            % MSE_PLANT reads Kp/Ki/Kd and K_switch from 'base'.
+            % K_switch: 0 = open (force passthrough), 1 = closed.
+            assignin('base', 'Kp', obj.Kp);
+            assignin('base', 'Ki', obj.Ki);
+            assignin('base', 'Kd', obj.Kd);
+            assignin('base', 'K_switch', obj.effectiveFeedbackSwitch());
+        end
+
+        function feedbackSwitch = effectiveFeedbackSwitch(obj)
+            if obj.ControlsEnabled && obj.ClosedLoop
+                feedbackSwitch = 1;
+            else
+                feedbackSwitch = 0;
+            end
+        end
+
         function setForcingInput(obj, tsInput)
             obj.ForcingSignal = tsInput;
             obj.S = tsInput.Time(end);
@@ -105,6 +137,7 @@ classdef AppModel < handle
             % MSE_PLANT From Workspace / Gain blocks read these from 'base'
             assignin('base', 'sim_input', tsInput);
             obj.applySimParamsToWorkspace();
+            obj.applyControlParamsToWorkspace();
 
             set_param(obj.SimulationModelName, 'StopTime', num2str(obj.S));
 
@@ -196,6 +229,7 @@ classdef AppModel < handle
             end
 
             obj.applySimParamsToWorkspace();
+            obj.applyControlParamsToWorkspace();
             obj.ensureExternalMode();
             obj.stopTargetQuietly();
             obj.prepareLiveStreaming();
@@ -207,6 +241,7 @@ classdef AppModel < handle
 
         function startSimulation(obj)
             obj.applySimParamsToWorkspace();
+            obj.applyControlParamsToWorkspace();
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
@@ -237,6 +272,7 @@ classdef AppModel < handle
                 "cart1_position", "cart2_position", ...
                 "cart1_velocity", "cart2_velocity", ...
                 "sim_input", "k_sim", "b_sim", ...
+                "Kp", "Ki", "Kd", "K_switch", ...
                 "T", "r", "Kt", "motor_eff"];
 
             run = struct();

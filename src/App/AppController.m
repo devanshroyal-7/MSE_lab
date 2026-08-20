@@ -31,6 +31,7 @@ classdef AppController < handle
             obj.View.fwdSaveOutputCallbackView = @() obj.handleSaveOutputCallback();
             obj.View.fwdEnableControlsCallbackView = @(enabled) obj.handleEnableControlsCallback(enabled);
             obj.View.fwdSimParamsChangedCallbackView = @(k, b, enabled) obj.handleSimParamsChangedCallback(k, b, enabled);
+            obj.View.fwdControlParamsChangedCallbackView = @(kp, ki, kd, closedLoop, enabled) obj.handleControlParamsChangedCallback(kp, ki, kd, closedLoop, enabled);
         end
 
         function handleRunSimCallback(obj)
@@ -137,6 +138,10 @@ classdef AppController < handle
 
         function handleSimParamsChangedCallback(obj, k, b, enabled)
             obj.Model.setSimulatedParameters(k, b, enabled);
+        end
+
+        function handleControlParamsChangedCallback(obj, kp, ki, kd, closedLoop, enabled)
+            obj.Model.setControlParameters(kp, ki, kd, closedLoop, enabled);
         end
 
         function handleSaveOutputCallback(obj)

@@ -47,6 +47,7 @@ classdef SidebarPanel < handle
         fwdSaveOutputCallback
         fwdEnableControlsCallback
         fwdSimParamsChangedCallback
+        fwdControlParamsChangedCallback
     end
 
     methods
@@ -193,6 +194,8 @@ classdef SidebarPanel < handle
             KpLabel.Layout.Row = 1;
 
             obj.KpEditField = uieditfield(ControlParamGrid, 'numeric');
+            obj.KpEditField.Value = 1;
+            obj.KpEditField.ValueChangedFcn = @(~, ~) obj.controlParamsChanged();
             obj.KpEditField.Layout.Column = 2;
             obj.KpEditField.Layout.Row = 1;
 
@@ -202,6 +205,8 @@ classdef SidebarPanel < handle
             KiLabel.Layout.Row = 2;
 
             obj.KiEditField = uieditfield(ControlParamGrid, 'numeric');
+            obj.KiEditField.Value = 0;
+            obj.KiEditField.ValueChangedFcn = @(~, ~) obj.controlParamsChanged();
             obj.KiEditField.Layout.Column = 2;
             obj.KiEditField.Layout.Row = 2;
 
@@ -211,6 +216,8 @@ classdef SidebarPanel < handle
             KdLabel.Layout.Row = 3;
 
             obj.KdEditField = uieditfield(ControlParamGrid, 'numeric');
+            obj.KdEditField.Value = 0;
+            obj.KdEditField.ValueChangedFcn = @(~, ~) obj.controlParamsChanged();
             obj.KdEditField.Layout.Column = 2;
             obj.KdEditField.Layout.Row = 3;
 
@@ -240,18 +247,19 @@ classdef SidebarPanel < handle
 
             obj.LoopModeGroup = uibuttongroup(ControlModeGrid, ...
                 "BorderType", "none", ...
-                "Title", "");
+                "Title", "", ...
+                "SelectionChangedFcn", @(~, ~) obj.controlParamsChanged());
             obj.LoopModeGroup.Layout.Column = 1;
             obj.LoopModeGroup.Layout.Row = 1;
 
             obj.OpenLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
                 "Text", " Open Loop", ...
+                "Value", true, ...
                 "FontWeight", "bold", ...
                 "Position", [1, 4, 120, 22]);
 
             obj.ClosedLoopRadio = uiradiobutton(obj.LoopModeGroup, ...
                 "Text", " Closed Loop", ...
-                "Value", true, ...
                 "FontWeight", "bold", ...
                 "Position", [245, 4, 140, 22]);
 
@@ -316,6 +324,18 @@ classdef SidebarPanel < handle
 
             if ~isempty(obj.fwdEnableControlsCallback)
                 obj.fwdEnableControlsCallback(logical(state));
+            end
+            obj.controlParamsChanged();
+        end
+
+        function controlParamsChanged(obj)
+            if ~isempty(obj.fwdControlParamsChangedCallback)
+                obj.fwdControlParamsChangedCallback( ...
+                    obj.KpEditField.Value, ...
+                    obj.KiEditField.Value, ...
+                    obj.KdEditField.Value, ...
+                    logical(obj.ClosedLoopRadio.Value), ...
+                    logical(obj.EnableControlsButton.Value));
             end
         end
 

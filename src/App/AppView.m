@@ -37,6 +37,7 @@ classdef AppView < handle
         fwdSaveOutputCallbackView
         fwdEnableControlsCallbackView
         fwdSimParamsChangedCallbackView
+        fwdControlParamsChangedCallbackView
     end
 
     methods
@@ -98,6 +99,7 @@ classdef AppView < handle
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
             obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
             obj.Sidebar.fwdSimParamsChangedCallback = @(k, b, enabled) obj.handleSimParamsChangedCallback(k, b, enabled);
+            obj.Sidebar.fwdControlParamsChangedCallback = @(kp, ki, kd, closedLoop, enabled) obj.handleControlParamsChangedCallback(kp, ki, kd, closedLoop, enabled);
             obj.TabGroup.SelectionChangedFcn = @(src, event) obj.handleTabChanged();
             obj.handleTabChanged();
         end
@@ -205,6 +207,12 @@ classdef AppView < handle
         function handleSimParamsChangedCallback(obj, k, b, enabled)
             if ~isempty(obj.fwdSimParamsChangedCallbackView)
                 obj.fwdSimParamsChangedCallbackView(k, b, enabled);
+            end
+        end
+
+        function handleControlParamsChangedCallback(obj, kp, ki, kd, closedLoop, enabled)
+            if ~isempty(obj.fwdControlParamsChangedCallbackView)
+                obj.fwdControlParamsChangedCallbackView(kp, ki, kd, closedLoop, enabled);
             end
         end
 
