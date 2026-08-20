@@ -58,6 +58,7 @@ classdef AppController < handle
             obj.View.updateResponsePlot([], []);
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
+            obj.View.clearControlsBode();
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
             % cannot stay greyed out after an interrupt.
@@ -123,6 +124,7 @@ classdef AppController < handle
                     pause(0.2);
                     obj.plotLoggedResponse();
                     obj.plotResponseFft();
+                    obj.plotControlsBode();
                 end
 
             catch ME
@@ -184,6 +186,7 @@ classdef AppController < handle
             obj.View.clearReferencePlot();
             obj.View.clearForcingFft();
             obj.View.clearResponseFft();
+            obj.View.clearControlsBode();
         end
 
         function handleSimParamsChangedCallback(obj, k, b, enabled)
@@ -274,6 +277,13 @@ classdef AppController < handle
             [t, x] = obj.Model.getLoggedResponse();
             spec = FftAnalyzer.compute(t, x);
             obj.View.updateResponseFft(spec);
+        end
+
+        function plotControlsBode(obj)
+            [tY, y] = obj.Model.getLoggedResponse();
+            [tU, u] = obj.Model.getLoggedForcing();
+            H = FftAnalyzer.fromInputOutput(tU, u, tY, y);
+            obj.View.updateControlsBode(H);
         end
 
         function spec = fftFromTimeseries(~, ts)

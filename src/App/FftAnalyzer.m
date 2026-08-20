@@ -120,9 +120,75 @@ classdef FftAnalyzer
                 "freq", zeros(0, 1), ...
                 "complex", zeros(0, 1), ...
                 "mag", zeros(0, 1), ...
+                "magDb", zeros(0, 1), ...
                 "phase", zeros(0, 1), ...
                 "fs", NaN, ...
                 "n", 0);
+        end
+
+        function H = fromInputOutput(tU, u, tY, y)
+            % Transfer Y(jω)/U(jω) on a shared time base. magDb is 20 log10 |H|.
+            H = FftAnalyzer.emptySpectrum();
+            if nargin < 4 || isempty(tU) || isempty(u) || isempty(tY) || isempty(y)
+                return;
+            end
+            tU = tU(:);
+            u = u(:);
+            tY = tY(:);
+            y = y(:);
+            nU = min(numel(tU), numel(u));
+            nY = min(numel(tY), numel(y));
+            tU = tU(1:nU);
+            u = u(1:nU);
+            tY = tY(1:nY);
+            y = y(1:nY);
+
+            t0 = max(tU(1), tY(1));
+            t1 = min(tU(end), tY(end));
+            if ~(isfinite(t0) && isfinite(t1)) || t1 - t0 <= 0
+                return;
+            end
+            dtU = diff(tU);
+            dtU = dtU(dtU > 0);
+            if numel(dtU) < 3
+                return;
+            end
+            dt = mean(dtU);
+            t = (t0:dt:t1)';
+            if numel(t) < 4
+                return;
+            end
+            uI = interp1(tU, u, t, 'linear', 'extrap');
+            yI = interp1(tY, y, t, 'linear', 'extrap');
+            specU = FftAnalyzer.compute(t, uI);
+            specY = FftAnalyzer.compute(t, yI);
+            H = FftAnalyzer.transfer(specY, specU);
+        end
+
+        function H = transfer(specY, specU)
+            H = FftAnalyzer.emptySpectrum();
+            if nargin < 2 || isempty(specY) || isempty(specU) ...
+                    || specY.n == 0 || specU.n == 0 ...
+                    || isempty(specY.freq) || isempty(specU.freq)
+                return;
+            end
+            freq = specU.freq(:);
+            U = specU.complex(:);
+            Y = specY.complex(:);
+            if numel(Y) ~= numel(U) || numel(specY.freq) ~= numel(freq) ...
+                    || any(abs(specY.freq(:) - freq) > 1e-12 * max(1, max(freq)))
+                Y = interp1(specY.freq(:), specY.complex(:), freq, 'linear', 0);
+            end
+            magU = abs(U);
+            floorVal = max(1e-20, 1e-12 * max(magU));
+            H.complex = Y ./ U;
+            H.complex(magU < floorVal) = NaN;
+            H.freq = freq;
+            H.mag = abs(H.complex);
+            H.magDb = 20 * log10(H.mag);
+            H.phase = FftAnalyzer.wrapPhaseDeg(rad2deg(angle(H.complex)));
+            H.fs = specU.fs;
+            H.n = min(specY.n, specU.n);
         end
     end
 

@@ -214,6 +214,14 @@ classdef AppView < handle
             obj.FFTPanel.updateResponse(FftAnalyzer.emptySpectrum());
         end
 
+        function updateControlsBode(obj, spec)
+            obj.ControlsFrequencyPanel.updateBode(spec);
+        end
+
+        function clearControlsBode(obj)
+            obj.ControlsFrequencyPanel.clearPlots();
+        end
+
         function setSimLampRunning(obj, isRunning)
             obj.Sidebar.setSimLampRunning(isRunning);
         end
