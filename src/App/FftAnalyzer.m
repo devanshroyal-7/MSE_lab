@@ -12,6 +12,10 @@ classdef FftAnalyzer
 
     %}
 
+    properties (Constant)
+        DisplayFreqMax = 20   % [Hz] excitation band for linear FFT / FRF axes
+    end
+
     methods (Static)
         function spec = compute(t, y, fs)
             spec = FftAnalyzer.emptySpectrum();
@@ -124,6 +128,10 @@ classdef FftAnalyzer
                 "phase", zeros(0, 1), ...
                 "fs", NaN, ...
                 "n", 0);
+        end
+
+        function xLim = displayXLim()
+            xLim = [0, FftAnalyzer.DisplayFreqMax];
         end
 
         function H = fromInputOutput(tU, u, tY, y)

@@ -31,6 +31,7 @@ classdef FRFPanel < handle
             obj.AxMag.TitleHorizontalAlignment = "left";
             xlabel(obj.AxMag, 'Frequency (Hz)');
             ylabel(obj.AxMag, 'Magnitude (mm/N)');
+            obj.AxMag.XLim = FftAnalyzer.displayXLim();
             hold(obj.AxMag, "on");
 
             obj.AxPhase = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
@@ -40,6 +41,7 @@ classdef FRFPanel < handle
             xlabel(obj.AxPhase, 'Frequency (Hz)');
             ylabel(obj.AxPhase, 'Phase (deg)');
             ylim(obj.AxPhase, [-180, 180]);
+            obj.AxPhase.XLim = FftAnalyzer.displayXLim();
             hold(obj.AxPhase, "on");
 
             obj.AxCoherence = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");
@@ -49,6 +51,7 @@ classdef FRFPanel < handle
             xlabel(obj.AxCoherence, 'Frequency (Hz)');
             ylabel(obj.AxCoherence, 'Coherence');
             ylim(obj.AxCoherence, [0, 1]);
+            obj.AxCoherence.XLim = FftAnalyzer.displayXLim();
             hold(obj.AxCoherence, "on");
         end
     end

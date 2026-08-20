@@ -81,22 +81,22 @@ classdef FrequencyPanel < handle
             ax.Layout.Column = col;
             xlabel(ax, 'Frequency (Hz)');
             ylabel(ax, yLabel);
+            ax.XLim = FftAnalyzer.displayXLim();
         end
 
         function setSpectrumLines(~, magAx, magLine, phaseAx, phaseLine, spec)
+            xLim = FftAnalyzer.displayXLim();
             if nargin < 6 || isempty(spec) || spec.n == 0 || isempty(spec.freq)
                 set(magLine, 'XData', NaN, 'YData', NaN);
                 set(phaseLine, 'XData', NaN, 'YData', NaN);
+                magAx.XLim = xLim;
+                phaseAx.XLim = xLim;
                 return;
             end
             set(magLine, 'XData', spec.freq, 'YData', spec.mag);
             set(phaseLine, 'XData', spec.freq, 'YData', spec.phase);
-            xLim = [spec.freq(1), spec.freq(end)];
-            if xLim(2) <= xLim(1)
-                xLim(2) = xLim(1) + 1;
-            end
-            xlim(magAx, xLim);
-            xlim(phaseAx, xLim);
+            magAx.XLim = xLim;
+            phaseAx.XLim = xLim;
             ylim(phaseAx, [-180, 180]);
         end
     end
