@@ -25,6 +25,7 @@ classdef AppController < handle
     properties (Access = private)
         StopRequested (1,1) logical = false
         RunInProgress (1,1) logical = false
+        PumpTimer
     end
 
     methods 
@@ -109,23 +110,19 @@ classdef AppController < handle
 
                     tRun = tic;
                     runLimit = obj.Model.S + timeout_s;
-                    pollDt = obj.Model.livePollPeriod();
-                    plotDt = 0.1;
-                    tLastPlot = -inf;
+                    obj.startPumpTimer();
+                    pumpCleanup = onCleanup(@() obj.stopPumpTimer()); %#ok<NASGU>
 
                     while ~obj.StopRequested ...
                             && obj.Model.isSimulationRunning() ...
                             && toc(tRun) < runLimit
-                        % Capture every ExtMode Duration-sized packet. Plot
-                        % slower so the UI does not stall the stitcher.
-                        obj.Model.pumpLiveBuffers();
-                        if toc(tRun) - tLastPlot >= plotDt
-                            obj.plotLiveResponse();
-                            tLastPlot = toc(tRun);
-                            obj.Model.pumpLiveBuffers();
-                        end
-                        pause(pollDt);
+                        % Capture runs on a 10 ms timer so uiaxes updates
+                        % cannot skip ExtMode packets. Plot is display-only.
+                        pause(0.1);
+                        obj.plotLiveResponse();
                     end
+
+                    obj.stopPumpTimer();
 
                     if obj.StopRequested || obj.Model.isSimulationRunning()
                         obj.Model.haltKernel();
@@ -232,6 +229,7 @@ classdef AppController < handle
 
     methods (Access = private)
         function finishRun(obj)
+            obj.stopPumpTimer();
             try
                 obj.Model.stopSimulation();
             catch
@@ -249,6 +247,42 @@ classdef AppController < handle
             tf = ~isempty(d) && isvalid(d) && d.CancelRequested;
         end
 
+        function startPumpTimer(obj)
+            obj.stopPumpTimer();
+            tmr = timer( ...
+                'Name', 'MSELivePump', ...
+                'ExecutionMode', 'fixedRate', ...
+                'Period', 0.01, ...
+                'BusyMode', 'drop', ...
+                'TimerFcn', @(~, ~) obj.pumpFromTimer());
+            obj.PumpTimer = tmr;
+            start(tmr);
+        end
+
+        function pumpFromTimer(obj)
+            try
+                if ~obj.StopRequested
+                    obj.Model.pumpLiveBuffers();
+                end
+            catch
+            end
+        end
+
+        function stopPumpTimer(obj)
+            tmr = obj.PumpTimer;
+            obj.PumpTimer = [];
+            if isempty(tmr)
+                return;
+            end
+            try
+                if isvalid(tmr)
+                    stop(tmr);
+                    delete(tmr);
+                end
+            catch
+            end
+        end
+
         function tf = isInterrupt(~, ME)
             tf = any(strcmp(ME.identifier, ...
                 {'MATLAB:interrupt', 'MATLAB:OperationTerminated'})) ...
@@ -256,12 +290,12 @@ classdef AppController < handle
         end
 
         function plotLiveResponse(obj)
-            [t, y] = obj.Model.getLiveCart1Position();
+            [t, y] = obj.Model.peekLiveCart1Position();
             tab = obj.View.selectedTabTitle();
             if tab == "Controls - Time"
                 [tRef, yRef] = obj.Model.getLoggedForcing();
-                [tErr, yErr] = obj.Model.getLiveError();
-                [tEff, yEff] = obj.Model.getLiveControlEffort();
+                [tErr, yErr] = obj.Model.peekLiveError();
+                [tEff, yEff] = obj.Model.peekLiveControlEffort();
                 obj.View.updateLiveControlsPlots(t, y, tRef, yRef, tErr, yErr, tEff, yEff);
             else
                 obj.View.updateLivePlots(t, y);
@@ -269,7 +303,7 @@ classdef AppController < handle
         end
 
         function plotLoggedResponse(obj)
-            [t, y] = obj.Model.getLiveCart1Position();
+            [t, y] = obj.Model.peekLiveCart1Position();
             if ~isempty(t) && ~isempty(y)
                 obj.View.updateResponsePlot(t, y);
             end

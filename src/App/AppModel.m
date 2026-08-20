@@ -223,6 +223,21 @@ classdef AppModel < handle
             y = AppModel.metersToMm(y);
         end
 
+        function [t, y] = peekLiveCart1Position(obj)
+            t = obj.TimeBuffer(:);
+            y = AppModel.metersToMm(obj.PositionBuffer(:));
+        end
+
+        function [t, y] = peekLiveError(obj)
+            t = obj.ErrorTimeBuffer(:);
+            y = AppModel.metersToMm(obj.ErrorBuffer(:));
+        end
+
+        function [t, y] = peekLiveControlEffort(obj)
+            t = obj.EffortTimeBuffer(:);
+            y = obj.EffortBuffer(:);
+        end
+
         function [t, y] = getLiveCart1Position(obj)
             if obj.LiveCaptureEnabled || obj.LiveAcceptLate
                 obj.captureLiveCart1Chunk();
@@ -452,18 +467,16 @@ classdef AppModel < handle
         end
 
         function waitForRemainingPackets(obj)
-            % Do not treat t(end)≈S as complete: a gappy stitch of every
-            % other ExtMode packet still ends near StopTime. Wait until the
-            % sample count is ~S/T or SDI replaces the buffer with a full
-            % record.
+            % A gappy stitch can still end at StopTime. Wait until SDI or
+            % a merge is gap-free (~S/T samples), not merely t(end)≈S.
             t0 = tic;
-            while toc(t0) < 5
+            while toc(t0) < 8
                 obj.pumpLiveBuffers();
                 obj.adoptAllRicherLogs();
                 if obj.logLooksComplete()
                     return;
                 end
-                pause(obj.livePollPeriod());
+                pause(0.02);
                 drawnow;
             end
         end
@@ -472,14 +485,38 @@ classdef AppModel < handle
             n = max(2, round(obj.S / obj.T));
         end
 
-        function tf = logLooksComplete(obj)
+        function tf = hasTimeGaps(obj, t)
             tf = false;
-            if isempty(obj.TimeBuffer)
+            if numel(t) < 2
                 return;
             end
-            nOk = numel(obj.TimeBuffer) >= obj.expectedSampleCount() - obj.LiveBufferSamples;
-            tOk = obj.TimeBuffer(end) >= obj.S - obj.LiveBufferSamples * obj.T;
-            tf = nOk && tOk;
+            tf = any(diff(t(:)) > 1.5 * obj.T);
+        end
+
+        function tf = isCompleteSeries(obj, t, y)
+            tf = false;
+            n = min(numel(t), numel(y));
+            if n < 2
+                return;
+            end
+            t = t(1:n);
+            if t(1) > max(2 * obj.T, 0.05)
+                return;
+            end
+            if t(end) < obj.S - 2 * obj.T
+                return;
+            end
+            if n < obj.expectedSampleCount() - 2
+                return;
+            end
+            if obj.hasTimeGaps(t)
+                return;
+            end
+            tf = true;
+        end
+
+        function tf = logLooksComplete(obj)
+            tf = obj.isCompleteSeries(obj.TimeBuffer, obj.PositionBuffer);
         end
 
         function adoptAllRicherLogs(obj)
@@ -507,10 +544,21 @@ classdef AppModel < handle
             if ~isempty(y)
                 candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
             end
+            [bestT, bestY] = obj.pickOrMergeSeries(candidates);
+            if ~isempty(bestY)
+                obj.(tField) = bestT(:)';
+                obj.(yField) = bestY(:)';
+                obj.(armedField) = true;
+            end
+        end
 
+        function [bestT, bestY] = pickOrMergeSeries(obj, candidates)
             bestT = [];
             bestY = [];
-            bestScore = -1;
+            valid = {};
+            completeT = [];
+            completeY = [];
+            completeN = -1;
             for i = 1:numel(candidates)
                 ti = candidates{i}{1};
                 yi = candidates{i}{2};
@@ -523,28 +571,44 @@ classdef AppModel < handle
                 if ~obj.looksLikeThisRun(ti, yi)
                     continue;
                 end
-                tSpan = ti(end) - ti(1);
-                score = n + 1e6 * max(tSpan, 0);
-                if ti(1) <= max(0.5, 0.1 * obj.S)
-                    score = score + 1e9;
-                end
-                if n >= 0.98 * obj.expectedSampleCount()
-                    score = score + 1e8;
-                end
-                if ti(end) >= 0.98 * obj.S
-                    score = score + 1e7;
-                end
-                if score > bestScore
-                    bestScore = score;
-                    bestT = ti;
-                    bestY = yi;
+                valid{end+1} = {ti(:), yi(:)}; %#ok<AGROW>
+                if obj.isCompleteSeries(ti, yi) && n > completeN
+                    completeN = n;
+                    completeT = ti;
+                    completeY = yi;
                 end
             end
-            if ~isempty(bestY)
-                obj.(tField) = bestT(:)';
-                obj.(yField) = bestY(:)';
-                obj.(armedField) = true;
+            if ~isempty(completeY)
+                bestT = completeT;
+                bestY = completeY;
+                return;
             end
+            for i = 1:numel(valid)
+                [bestT, bestY] = obj.mergeByTime(bestT, bestY, ...
+                    valid{i}{1}, valid{i}{2});
+            end
+        end
+
+        function [t, y] = mergeByTime(obj, t1, y1, t2, y2)
+            if isempty(y2)
+                t = t1(:);
+                y = y1(:);
+                return;
+            end
+            if isempty(y1)
+                t = t2(:);
+                y = y2(:);
+                return;
+            end
+            n1 = min(numel(t1), numel(y1));
+            n2 = min(numel(t2), numel(y2));
+            tAll = [t1(1:n1); t2(1:n2)];
+            yAll = [y1(1:n1); y2(1:n2)];
+            [tAll, order] = sort(tAll);
+            yAll = yAll(order);
+            keep = [true; diff(tAll) > (obj.T / 2)];
+            t = tAll(keep);
+            y = yAll(keep);
         end
 
         function promoteLoggedSignalsToWorkspace(obj)
@@ -605,6 +669,10 @@ classdef AppModel < handle
             tIn = tIn(1:n);
             yIn = yIn(1:n);
             if numel(yIn) == numel(tClock) && max(abs(tIn(:) - tClock(:))) <= obj.T
+                yOut = yIn(:)';
+                return;
+            end
+            if obj.hasTimeGaps(tIn)
                 yOut = yIn(:)';
                 return;
             end
@@ -731,29 +799,7 @@ classdef AppModel < handle
             if ~isempty(y)
                 candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
             end
-            bestT = [];
-            bestY = [];
-            bestScore = -1;
-            for i = 1:numel(candidates)
-                ti = candidates{i}{1};
-                yi = candidates{i}{2};
-                n = min(numel(ti), numel(yi));
-                if n < 2
-                    continue;
-                end
-                ti = ti(1:n);
-                yi = yi(1:n);
-                if ~obj.looksLikeThisRun(ti, yi)
-                    continue;
-                end
-                tSpan = ti(end) - ti(1);
-                score = n + 1e6 * max(tSpan, 0);
-                if score > bestScore
-                    bestScore = score;
-                    bestT = ti;
-                    bestY = yi;
-                end
-            end
+            [bestT, bestY] = obj.pickOrMergeSeries(candidates);
             if ~isempty(bestY)
                 log.t = bestT(:)';
                 log.y = bestY(:)';
@@ -1025,13 +1071,17 @@ classdef AppModel < handle
 
         function tf = sdiRecordIsStale(obj, runObj, t, y)
             tf = true;
-            if isempty(runObj)
-                return;
-            end
-            if obj.isStaleSdiId(runObj.id)
+            if isempty(y)
                 return;
             end
             if obj.matchesStaleLog(t, y)
+                return;
+            end
+            reused = isempty(runObj) || obj.isStaleSdiId(runObj.id);
+            if reused
+                % Same SDI run id as before Start, but this recording can
+                % still be a complete replacement for the current StopTime.
+                tf = ~obj.isCompleteSeries(t, y);
                 return;
             end
             tf = false;
@@ -1053,24 +1103,7 @@ classdef AppModel < handle
         end
 
         function runObj = currentSdiRun(obj)
-            runObj = [];
-            cand = obj.currentSdiRunUnfiltered();
-            if ~isempty(cand) && ~obj.isStaleSdiId(cand.id)
-                runObj = cand;
-                return;
-            end
-            ids = obj.allSdiRunIds();
-            for i = numel(ids):-1:1
-                if obj.isStaleSdiId(ids(i))
-                    continue;
-                end
-                try
-                    runObj = Simulink.sdi.getRun(ids(i));
-                catch
-                    runObj = [];
-                end
-                return;
-            end
+            runObj = obj.currentSdiRunUnfiltered();
         end
 
         function runObj = currentSdiRunUnfiltered(obj)
@@ -1140,17 +1173,16 @@ classdef AppModel < handle
 
             covers = t(1) <= timeBuf(1) + obj.T ...
                 && t(end) >= timeBuf(end) - obj.T;
-            if covers && numel(t) > numel(timeBuf)
+            if (covers && numel(t) > numel(timeBuf)) ...
+                    || obj.isCompleteSeries(t, y)
                 timeBuf = t;
                 yBuf = y;
                 return;
             end
 
-            mask = t > timeBuf(end) + (obj.T / 2);
-            if any(mask)
-                timeBuf = [timeBuf, t(mask)];
-                yBuf = [yBuf, y(mask)];
-            end
+            [timeBuf, yBuf] = obj.mergeByTime(timeBuf(:), yBuf(:), t(:), y(:));
+            timeBuf = timeBuf(:)';
+            yBuf = yBuf(:)';
         end
 
         function tf = looksLikeThisRun(obj, t, y)
