@@ -1,8 +1,10 @@
 classdef AppController < handle
     % Glue between AppModel and AppView. Start Simulation compiles/connects
-    % Desktop Real-Time and waits until stop or a 30 s timeout. Create Forcing
-    % Function (or Create Reference Trajectory when the controller is on) opens
-    % SignalBuilderApp. Save Output writes a .mat of logged data.
+    % Desktop Real-Time and waits until stop or a 30 s timeout. Stop Simulation
+    % is the UI equivalent of Ctrl+C: halt the kernel, disconnect, restore
+    % Start / Save / etc. Create Forcing Function (or Create Reference
+    % Trajectory when the controller is on) opens SignalBuilderApp. Save Output
+    % writes a .mat of logged data.
     %
     %{
     Example usage:
@@ -20,6 +22,11 @@ classdef AppController < handle
 
     end
 
+    properties (Access = private)
+        StopRequested (1,1) logical = false
+        RunInProgress (1,1) logical = false
+    end
+
     methods 
         function obj = AppController(model, view)
             obj.Model = model;
@@ -27,6 +34,7 @@ classdef AppController < handle
 
             % Callback
             obj.View.fwdRunSimCallbackView = @() obj.handleRunSimCallback();
+            obj.View.fwdStopSimCallbackView = @() obj.handleStopSimCallback();
             obj.View.fwdSignalBuilderCallbackView = @() obj.handleSignalBuilderCallback();
             obj.View.fwdSaveOutputCallbackView = @() obj.handleSaveOutputCallback();
             obj.View.fwdEnableControlsCallbackView = @(enabled) obj.handleEnableControlsCallback(enabled);
@@ -34,9 +42,15 @@ classdef AppController < handle
         end
 
         function handleRunSimCallback(obj)
+            if obj.RunInProgress
+                return;
+            end
+
             figHandle = obj.View.UIFigure;
             timeout_s = obj.Model.RunTimeout;
             d = [];
+            obj.StopRequested = false;
+            obj.RunInProgress = true;
 
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
@@ -44,23 +58,43 @@ classdef AppController < handle
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
 
+            % Ctrl+C in the Command Window still runs this, so Start/Save
+            % cannot stay greyed out after an interrupt.
+            cleanupObj = onCleanup(@() obj.finishRun()); %#ok<NASGU>
+
             try
                 d = uiprogressdlg(figHandle, ...
                     "Title", "Simulink Desktop-Real Time", ...
                     "Message", "Compiling C code & connecting to real-time target...", ...
-                    "Indeterminate", "on");
+                    "Indeterminate", "on", ...
+                    "Cancelable", "on", ...
+                    "CancelText", "Stop");
                 drawnow;
 
                 tConnect = tic;
                 obj.Model.connectTarget();
 
-                while strcmp(obj.Model.getSimulationStatus(), 'stopped') && toc(tConnect) < timeout_s
+                while ~obj.StopRequested ...
+                        && ~obj.dialogCancelRequested(d) ...
+                        && strcmp(obj.Model.getSimulationStatus(), 'stopped') ...
+                        && toc(tConnect) < timeout_s
                     pause(0.05);
                     drawnow;
                 end
 
-                close(d);
+                if obj.dialogCancelRequested(d)
+                    obj.StopRequested = true;
+                end
+
+                if ~isempty(d) && isvalid(d)
+                    close(d);
+                end
                 d = [];
+
+                if obj.StopRequested
+                    obj.Model.stopSimulation();
+                    return;
+                end
 
                 if strcmp(obj.Model.getSimulationStatus(), 'stopped')
                     errordlg("Model failed to enter real-time execution", "Target Error");
@@ -71,7 +105,9 @@ classdef AppController < handle
                     tRun = tic;
                     runLimit = obj.Model.S + timeout_s;
 
-                    while obj.Model.isSimulationRunning() && toc(tRun) < runLimit
+                    while ~obj.StopRequested ...
+                            && obj.Model.isSimulationRunning() ...
+                            && toc(tRun) < runLimit
                         obj.plotLiveResponse();
                         % pause already flushes graphics. Extra drawnow here
                         % plus yyaxis/xlim on uiaxes causes SceneTree
@@ -79,7 +115,7 @@ classdef AppController < handle
                         pause(0.1);
                     end
 
-                    if obj.Model.isSimulationRunning()
+                    if obj.StopRequested || obj.Model.isSimulationRunning()
                         obj.Model.stopSimulation();
                     end
 
@@ -92,11 +128,23 @@ classdef AppController < handle
                 if ~isempty(d) && isvalid(d)
                     close(d);
                 end
-                errordlg(ME.message, 'Simulation Launch Failed');
+                try
+                    obj.Model.stopSimulation();
+                catch
+                end
+                if ~obj.StopRequested && ~obj.isInterrupt(ME)
+                    errordlg(ME.message, 'Simulation Launch Failed');
+                end
             end
+        end
 
-            obj.View.setSimLampRunning(false);
-            obj.View.setAppEnabled(true);
+        function handleStopSimCallback(obj)
+            obj.StopRequested = true;
+            try
+                obj.Model.stopSimulation();
+            catch
+            end
+            obj.restoreIdleUi();
         end
 
         function handleSignalBuilderCallback(obj)
@@ -153,6 +201,30 @@ classdef AppController < handle
     end
 
     methods (Access = private)
+        function finishRun(obj)
+            try
+                obj.Model.stopSimulation();
+            catch
+            end
+            obj.restoreIdleUi();
+            obj.RunInProgress = false;
+        end
+
+        function restoreIdleUi(obj)
+            obj.View.setSimLampRunning(false);
+            obj.View.setAppEnabled(true);
+        end
+
+        function tf = dialogCancelRequested(~, d)
+            tf = ~isempty(d) && isvalid(d) && d.CancelRequested;
+        end
+
+        function tf = isInterrupt(~, ME)
+            tf = any(strcmp(ME.identifier, ...
+                {'MATLAB:interrupt', 'MATLAB:OperationTerminated'})) ...
+                || contains(ME.message, 'Operation terminated', 'IgnoreCase', true);
+        end
+
         function plotLiveResponse(obj)
             [t, y] = obj.Model.getLiveCart1Position();
             [tf, f] = obj.Model.getLiveFInput();

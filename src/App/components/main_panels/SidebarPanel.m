@@ -42,6 +42,7 @@ classdef SidebarPanel < handle
 
         % Fwd Callbacks
         fwdRunSignalCallback
+        fwdStopSignalCallback
 
         fwdSignalBuilderCallback
         fwdSaveOutputCallback
@@ -89,10 +90,10 @@ classdef SidebarPanel < handle
             obj.SimStopButton = uibutton(obj.MainLayoutGrid, ...
                 "Text", "Stop Simulation", ...
                 "Icon", "sim_stop.png", ...
-                "IconAlignment","top");
+                "IconAlignment","top", ...
+                "ButtonPushedFcn", @(~,~) obj.stopSimCallback);
             obj.SimStopButton.Layout.Column = [3, 4];
             obj.SimStopButton.Layout.Row = [2, 3];
-            % obj.SimStopButton.ButtonPushedFcn = @(~,~) obj.stopSimCallback;
 
             %%% Simulated Parameters %%%
             SimulatedParamsPanel = uipanel(obj.MainLayoutGrid, ...
@@ -325,6 +326,12 @@ classdef SidebarPanel < handle
             end
         end
 
+        function stopSimCallback(obj)
+            if ~isempty(obj.fwdStopSignalCallback)
+                obj.fwdStopSignalCallback();
+            end
+        end
+
         function createFcnCallback(obj)
             if ~isempty(obj.fwdSignalBuilderCallback)
                 obj.fwdSignalBuilderCallback();
@@ -368,6 +375,7 @@ classdef SidebarPanel < handle
             end
 
             obj.SimStartButton.Enable = enableVal;
+            obj.SimStopButton.Enable = 'on';
             obj.CreateFcnButton.Enable = enableVal;
             obj.SaveOutputButton.Enable = enableVal;
             obj.EnableSimParamButton.Enable = enableVal;

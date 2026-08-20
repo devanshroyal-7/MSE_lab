@@ -33,6 +33,7 @@ classdef AppView < handle
 
         % Callback properties
         fwdRunSimCallbackView
+        fwdStopSimCallbackView
         fwdSignalBuilderCallbackView
         fwdSaveOutputCallbackView
         fwdEnableControlsCallbackView
@@ -94,6 +95,7 @@ classdef AppView < handle
 
             obj.Sidebar = SidebarPanel(SidePanel);
             obj.Sidebar.fwdRunSignalCallback = @() obj.handleRunSimCallback();
+            obj.Sidebar.fwdStopSignalCallback = @() obj.handleStopSimCallback();
             obj.Sidebar.fwdSignalBuilderCallback = @() obj.handleSignalBuilderCallback();
             obj.Sidebar.fwdSaveOutputCallback = @() obj.handleSaveOutputCallback();
             obj.Sidebar.fwdEnableControlsCallback = @(enabled) obj.handleEnableControlsCallback(enabled);
@@ -199,6 +201,12 @@ classdef AppView < handle
         function handleRunSimCallback(obj)
             if ~isempty(obj.fwdRunSimCallbackView)
                 obj.fwdRunSimCallbackView();
+            end
+        end
+
+        function handleStopSimCallback(obj)
+            if ~isempty(obj.fwdStopSimCallbackView)
+                obj.fwdStopSimCallbackView();
             end
         end
 
