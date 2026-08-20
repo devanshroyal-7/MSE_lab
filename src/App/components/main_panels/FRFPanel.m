@@ -7,9 +7,8 @@ classdef FRFPanel < handle
 
     >> fig = uifigure("Position", [100, 100, 800, 700]);
     >> panel = FRFPanel(fig);
-    >> plot(panel.AxMag, freq, magH);
-    >> plot(panel.AxPhase, freq, phaseH);
-    >> plot(panel.AxCoherence, freq, coh);
+    >> result = FrfAnalyzer.compute(tF, f, tX, x);
+    >> panel.update(result);
 
     %}
 
@@ -18,6 +17,10 @@ classdef FRFPanel < handle
         AxMag
         AxPhase
         AxCoherence
+
+        MagLine
+        PhaseLine
+        CoherenceLine
     end
     methods
         function obj = FRFPanel(parentContainer)
@@ -53,6 +56,59 @@ classdef FRFPanel < handle
             ylim(obj.AxCoherence, [0, 1]);
             obj.AxCoherence.XLim = FftAnalyzer.displayXLim();
             hold(obj.AxCoherence, "on");
+
+            obj.MagLine = plot(obj.AxMag, NaN, NaN, 'b-', LineWidth=1.5);
+            obj.PhaseLine = plot(obj.AxPhase, NaN, NaN, 'b-', LineWidth=1.5);
+            obj.CoherenceLine = plot(obj.AxCoherence, NaN, NaN, 'b-', LineWidth=1.5);
+        end
+
+        function update(obj, result)
+            if nargin < 2 || isempty(result) || result.n == 0 || isempty(result.freq)
+                obj.clearPlots();
+                return;
+            end
+            mag = result.mag;
+            mag(~isfinite(mag)) = NaN;
+            phase = result.phase;
+            phase(~isfinite(phase)) = NaN;
+            coh = result.coherence;
+            coh(~isfinite(coh)) = NaN;
+
+            set(obj.MagLine, 'XData', result.freq, 'YData', mag);
+            set(obj.PhaseLine, 'XData', result.freq, 'YData', phase);
+            set(obj.CoherenceLine, 'XData', result.freq, 'YData', coh);
+
+            if isfield(result, 'xLim') && numel(result.xLim) == 2 && result.xLim(2) > result.xLim(1)
+                xLim = result.xLim;
+            else
+                xLim = FftAnalyzer.displayXLim();
+            end
+            xlim(obj.AxMag, xLim);
+            xlim(obj.AxPhase, xLim);
+            xlim(obj.AxCoherence, xLim);
+
+            finiteMag = mag(isfinite(mag));
+            if isempty(finiteMag)
+                ylim(obj.AxMag, 'auto');
+            else
+                yTop = max(finiteMag);
+                if ~(yTop > 0)
+                    yTop = 1;
+                end
+                ylim(obj.AxMag, [0, yTop * 1.1]);
+            end
+            ylim(obj.AxPhase, [-180, 180]);
+            ylim(obj.AxCoherence, [0, 1]);
+        end
+
+        function clearPlots(obj)
+            set(obj.MagLine, 'XData', NaN, 'YData', NaN);
+            set(obj.PhaseLine, 'XData', NaN, 'YData', NaN);
+            set(obj.CoherenceLine, 'XData', NaN, 'YData', NaN);
+            xLim = FftAnalyzer.displayXLim();
+            xlim(obj.AxMag, xLim);
+            xlim(obj.AxPhase, xLim);
+            xlim(obj.AxCoherence, xLim);
         end
     end
 end

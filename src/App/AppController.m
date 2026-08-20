@@ -58,6 +58,7 @@ classdef AppController < handle
             obj.View.updateResponsePlot([], []);
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
+            obj.View.clearFrf();
             obj.View.clearControlsBode();
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
@@ -124,6 +125,7 @@ classdef AppController < handle
                     pause(0.2);
                     obj.plotLoggedResponse();
                     obj.plotResponseFft();
+                    obj.plotFrf();
                     obj.plotControlsBode();
                 end
 
@@ -186,6 +188,7 @@ classdef AppController < handle
             obj.View.clearReferencePlot();
             obj.View.clearForcingFft();
             obj.View.clearResponseFft();
+            obj.View.clearFrf();
             obj.View.clearControlsBode();
         end
 
@@ -284,6 +287,13 @@ classdef AppController < handle
             [tU, u] = obj.Model.getLoggedForcing();
             H = FftAnalyzer.fromInputOutput(tU, u, tY, y);
             obj.View.updateControlsBode(H);
+        end
+
+        function plotFrf(obj)
+            [tF, f] = obj.Model.getLoggedForcing();
+            [tX, x] = obj.Model.getLoggedResponse();
+            result = FrfAnalyzer.compute(tF, f, tX, x);
+            obj.View.updateFrf(result);
         end
 
         function spec = fftFromTimeseries(~, ts)

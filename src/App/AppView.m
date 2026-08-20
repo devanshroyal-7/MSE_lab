@@ -214,6 +214,14 @@ classdef AppView < handle
             obj.FFTPanel.updateResponse(FftAnalyzer.emptySpectrum());
         end
 
+        function updateFrf(obj, result)
+            obj.FRFPanel.update(result);
+        end
+
+        function clearFrf(obj)
+            obj.FRFPanel.clearPlots();
+        end
+
         function updateControlsBode(obj, spec)
             obj.ControlsFrequencyPanel.updateBode(spec);
         end
