@@ -281,6 +281,7 @@ classdef AppModel < handle
             obj.LiveArmedEffort = false;
             obj.LiveAcceptLate = false;
             obj.SdiFreshForThisRun = false;
+            obj.clearLoggedWorkspace();
             obj.snapshotStaleSdi();
 
             obj.ensureExternalMode();
@@ -489,6 +490,9 @@ classdef AppModel < handle
                 if n >= 0.90 * obj.expectedSampleCount()
                     score = score + 1e8;
                 end
+                if ti(end) >= 0.90 * obj.S
+                    score = score + 1e7;
+                end
                 if score > bestScore
                     bestScore = score;
                     bestT = ti;
@@ -503,6 +507,9 @@ classdef AppModel < handle
         end
 
         function promoteLoggedSignalsToWorkspace(obj)
+            % Labs plot(rt_time, cart1_position) and plot(rt_time, f_input).
+            % Same clock, same length, plant origin at t≈0.
+            obj.harmonizeStitchedLogs();
             if ~isempty(obj.TimeBuffer)
                 assignin('base', 'rt_time', obj.TimeBuffer(:));
             end
@@ -521,6 +528,65 @@ classdef AppModel < handle
             obj.promoteNamed('cart2_position', 'Cart2-Position');
             obj.promoteNamed('cart1_velocity', 'Cart1-Velocity');
             obj.promoteNamed('cart2_velocity', 'Cart2-Velocity');
+        end
+
+        function harmonizeStitchedLogs(obj)
+            n = min(numel(obj.TimeBuffer), numel(obj.PositionBuffer));
+            if n < 2
+                return;
+            end
+            t = obj.TimeBuffer(1:n);
+            y = obj.PositionBuffer(1:n);
+            [t, y] = obj.monotonicPlantClock(t, y);
+            obj.TimeBuffer = t(:)';
+            obj.PositionBuffer = y(:)';
+            if ~isempty(obj.ForcingBuffer) && ~isempty(obj.ForcingTimeBuffer)
+                obj.ForcingBuffer = obj.resampleOntoClock( ...
+                    obj.ForcingTimeBuffer, obj.ForcingBuffer, t);
+                obj.ForcingTimeBuffer = t(:)';
+            end
+            if ~isempty(obj.ErrorBuffer) && ~isempty(obj.ErrorTimeBuffer)
+                obj.ErrorBuffer = obj.resampleOntoClock( ...
+                    obj.ErrorTimeBuffer, obj.ErrorBuffer, t);
+                obj.ErrorTimeBuffer = t(:)';
+            end
+            if ~isempty(obj.EffortBuffer) && ~isempty(obj.EffortTimeBuffer)
+                obj.EffortBuffer = obj.resampleOntoClock( ...
+                    obj.EffortTimeBuffer, obj.EffortBuffer, t);
+                obj.EffortTimeBuffer = t(:)';
+            end
+        end
+
+        function yOut = resampleOntoClock(obj, tIn, yIn, tClock)
+            yOut = yIn;
+            if isempty(yIn) || isempty(tIn) || numel(tClock) < 2
+                return;
+            end
+            n = min(numel(tIn), numel(yIn));
+            tIn = tIn(1:n);
+            yIn = yIn(1:n);
+            if numel(yIn) == numel(tClock) && max(abs(tIn(:) - tClock(:))) <= obj.T
+                yOut = yIn(:)';
+                return;
+            end
+            try
+                yOut = interp1(tIn(:), yIn(:), tClock(:), 'linear', 'extrap')';
+            catch
+                yOut = yIn(:)';
+            end
+        end
+
+        function [t, y] = monotonicPlantClock(obj, t, y)
+            t = t(:);
+            y = y(:);
+            n = min(numel(t), numel(y));
+            t = t(1:n);
+            y = y(1:n);
+            [t, order] = sort(t);
+            y = y(order);
+            keep = [true; diff(t) > (obj.T / 2)];
+            t = t(keep);
+            y = y(keep);
         end
 
         function promoteNamed(obj, wsName, sdiName)
@@ -576,14 +642,49 @@ classdef AppModel < handle
                 end
                 raw = evalin('base', varName);
                 [t, y] = AppModel.signalValuesToXY(raw);
-                if isempty(t) && ~isempty(y) && evalin('base', "exist('rt_time', 'var')")
-                    tWs = squeeze(evalin('base', 'rt_time'));
-                    tWs = tWs(:);
-                    if numel(tWs) == numel(y)
-                        t = tWs;
+                t = obj.toSimSeconds(t);
+                if strcmp(varName, 'rt_time')
+                    if ~isempty(y)
+                        t = obj.toSimSeconds(y);
                     end
+                    y = t;
+                    return;
+                end
+                tClock = obj.readWorkspaceClock();
+                if numel(tClock) == numel(y) && numel(y) >= 2
+                    t = tClock;
                 end
             catch
+            end
+        end
+
+        function tClock = readWorkspaceClock(obj)
+            tClock = [];
+            try
+                if ~evalin('base', "exist('rt_time', 'var')")
+                    return;
+                end
+                raw = evalin('base', 'rt_time');
+                [t, y] = AppModel.signalValuesToXY(raw);
+                if ~isempty(y)
+                    tClock = obj.toSimSeconds(y);
+                else
+                    tClock = obj.toSimSeconds(t);
+                end
+            catch
+            end
+        end
+
+        function clearLoggedWorkspace(~)
+            names = { ...
+                'rt_time', 'f_input', 'error', 'control_effort', ...
+                'cart1_position', 'cart2_position', ...
+                'cart1_velocity', 'cart2_velocity'};
+            for i = 1:numel(names)
+                try
+                    evalin('base', ['clear ' names{i}]);
+                catch
+                end
             end
         end
 
@@ -632,23 +733,77 @@ classdef AppModel < handle
                 if isempty(runObj)
                     return;
                 end
-                sigs = runObj.getAllSignals();
-                hit = [];
-                for i = 1:numel(sigs)
-                    name = char(sigs(i).Name);
-                    if strcmpi(name, nameFragment)
-                        hit = i;
-                        break;
+                [t, y] = obj.sdiSignalXY(runObj, nameFragment);
+                if obj.isClockName(nameFragment)
+                    if ~isempty(y)
+                        t = obj.toSimSeconds(y);
+                        y = t;
                     end
-                    if isempty(hit) && contains(name, nameFragment, 'IgnoreCase', true)
-                        hit = i;
-                    end
-                end
-                if isempty(hit)
                     return;
                 end
-                [t, y] = AppModel.signalValuesToXY(sigs(hit).Values);
+                tClock = obj.sdiClockFromRun(runObj);
+                if numel(tClock) == numel(y) && numel(y) >= 2
+                    t = tClock;
+                end
             catch
+            end
+        end
+
+        function [t, y] = sdiSignalXY(obj, runObj, nameFragment)
+            t = [];
+            y = [];
+            sigs = runObj.getAllSignals();
+            hit = [];
+            for i = 1:numel(sigs)
+                name = char(sigs(i).Name);
+                if strcmpi(name, nameFragment)
+                    hit = i;
+                    break;
+                end
+                if isempty(hit) && contains(name, nameFragment, 'IgnoreCase', true)
+                    hit = i;
+                end
+            end
+            if isempty(hit)
+                return;
+            end
+            [t, y] = AppModel.signalValuesToXY(sigs(hit).Values);
+            t = obj.toSimSeconds(t);
+        end
+
+        function tClock = sdiClockFromRun(obj, runObj)
+            tClock = [];
+            clockNames = {'rt_time', 'Clock', 'tout'};
+            for i = 1:numel(clockNames)
+                [t, y] = obj.sdiSignalXY(runObj, clockNames{i});
+                if ~isempty(y)
+                    tClock = obj.toSimSeconds(y);
+                elseif ~isempty(t)
+                    tClock = t;
+                end
+                if numel(tClock) >= 2
+                    return;
+                end
+            end
+        end
+
+        function tf = isClockName(~, nameFragment)
+            tf = any(strcmpi(char(nameFragment), {'rt_time', 'Clock', 'tout', 'time'}));
+        end
+
+        function t = toSimSeconds(obj, t)
+            if isempty(t)
+                return;
+            end
+            if isduration(t)
+                t = seconds(t);
+            elseif isdatetime(t)
+                t = seconds(t - t(1));
+            end
+            t = double(t(:));
+            % Wall-clock / epoch seconds, not simulation time.
+            if t(1) > max(100, 10 * obj.S)
+                t = t - t(1);
             end
         end
 
@@ -778,6 +933,13 @@ classdef AppModel < handle
                 t = vals.Time(:);
                 y = squeeze(vals.Data);
                 y = y(:);
+                if isduration(t)
+                    t = seconds(t);
+                    t = t(:);
+                elseif isdatetime(t)
+                    t = seconds(t - t(1));
+                    t = t(:);
+                end
             elseif istimetable(vals)
                 t = seconds(vals.Time);
                 t = t(:);
