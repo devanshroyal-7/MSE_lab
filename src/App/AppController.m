@@ -73,8 +73,10 @@ classdef AppController < handle
 
                     while obj.Model.isSimulationRunning() && toc(tRun) < runLimit
                         obj.plotLiveResponse();
-                        pause(0.05);
-                        drawnow;
+                        % pause already flushes graphics. Extra drawnow here
+                        % plus yyaxis/xlim on uiaxes causes SceneTree
+                        % replaceChild warnings.
+                        pause(0.1);
                     end
 
                     if obj.Model.isSimulationRunning()
@@ -153,13 +155,8 @@ classdef AppController < handle
     methods (Access = private)
         function plotLiveResponse(obj)
             [t, y] = obj.Model.getLiveCart1Position();
-            if ~isempty(t) && ~isempty(y)
-                obj.View.updateResponsePlot(t, y);
-            end
             [tf, f] = obj.Model.getLiveFInput();
-            if ~isempty(tf) && ~isempty(f)
-                obj.View.updateControlsReferenceInput(tf, f);
-            end
+            obj.View.updateLivePlots(t, y, tf, f);
         end
 
         function plotLoggedResponse(obj)

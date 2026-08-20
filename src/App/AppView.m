@@ -134,6 +134,24 @@ classdef AppView < handle
             obj.ControlsPanel.updateDisplacement(t, y);
         end
 
+        function updateLivePlots(obj, t, y, tForce, yForce)
+            % Only touch axes on the visible tab. Updating hidden uiaxes
+            % from the live loop trips MATLAB's SceneTree replaceChild bug.
+            tab = obj.selectedTabTitle();
+            if tab == "Time"
+                if ~isempty(t)
+                    obj.TimeDomainPanel.updateResponsePlot(t, y);
+                end
+            elseif tab == "Controls - Time"
+                if ~isempty(t)
+                    obj.ControlsPanel.updateDisplacement(t, y);
+                end
+                if nargin >= 5 && ~isempty(tForce)
+                    obj.ControlsPanel.updateReferenceInput(tForce, yForce);
+                end
+            end
+        end
+
         function updateControlsReferenceInput(obj, t, y)
             obj.ControlsPanel.updateReferenceInput(t, y);
         end
@@ -217,6 +235,14 @@ classdef AppView < handle
             onControlsFreq = ~isempty(obj.ControlsFreqTab) && isequal(selected, obj.ControlsFreqTab);
             onControls = onControlsTime || onControlsFreq;
             obj.Sidebar.setControlPanelsVisible(onControls, onControls);
+        end
+
+        function name = selectedTabTitle(obj)
+            name = "";
+            try
+                name = string(obj.TabGroup.SelectedTab.Title);
+            catch
+            end
         end
     end
 end

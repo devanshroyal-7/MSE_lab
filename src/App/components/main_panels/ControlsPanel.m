@@ -90,6 +90,9 @@ classdef ControlsPanel < handle
         end
 
         function setTimeLine(~, ax, lineHandle, t, y)
+            if ~isvalid(lineHandle)
+                return;
+            end
             if nargin < 5 || isempty(t) || isempty(y)
                 set(lineHandle, 'XData', NaN, 'YData', NaN);
                 return;
@@ -99,7 +102,10 @@ classdef ControlsPanel < handle
             n = min(numel(t), numel(y));
             set(lineHandle, 'XData', t(1:n), 'YData', y(1:n));
             xEnd = max(0.1, t(n));
-            xlim(ax, [0, xEnd]);
+            cur = ax.XLim;
+            if abs(cur(1)) > 1e-9 || abs(cur(2) - xEnd) > 1e-9
+                ax.XLim = [0, xEnd];
+            end
         end
     end
 end
