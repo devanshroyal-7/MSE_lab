@@ -104,6 +104,7 @@ classdef FftAnalyzer
                 spec.complex = C;
                 spec.mag = abs(C);
                 spec.phase = FftAnalyzer.wrapPhaseDeg(rad2deg(angle(C)));
+                spec.magDb = 20 * log10(spec.mag);
                 return;
             end
 
@@ -116,6 +117,7 @@ classdef FftAnalyzer
             spec.complex = acc / numel(spectra);
             spec.mag = abs(spec.complex);
             spec.phase = FftAnalyzer.wrapPhaseDeg(rad2deg(angle(spec.complex)));
+            spec.magDb = 20 * log10(spec.mag);
             spec.n = max([spectra.n]);
         end
 

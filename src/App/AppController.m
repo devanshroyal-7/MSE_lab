@@ -1,10 +1,12 @@
 classdef AppController < handle
     % Glue between AppModel and AppView. Start Simulation compiles/connects
-    % Desktop Real-Time and waits until stop or a 30 s timeout. Stop Simulation
-    % is the UI equivalent of Ctrl+C: halt the kernel, disconnect, restore
-    % Start / Save / etc. Create Forcing Function (or Create Reference
-    % Trajectory when the controller is on) opens SignalBuilderApp. Save Output
-    % writes a .mat of logged data.
+    % Desktop Real-Time and waits until stop or a 30 s timeout. When Average
+    % Runs is enabled, the same forcing function is repeated N times on one
+    % connection (1 s gap between runs); plots show the running average.
+    % Stop Simulation is the UI equivalent of Ctrl+C: halt the kernel,
+    % disconnect, restore Start / Save / etc. Create Forcing Function (or
+    % Create Reference Trajectory when the controller is on) opens
+    % SignalBuilderApp. Save Output writes a .mat of logged data.
     %
     %{
     Example usage:
@@ -61,6 +63,16 @@ classdef AppController < handle
             obj.View.clearResponseFft();
             obj.View.clearFrf();
             obj.View.clearControlsBode();
+            obj.Model.LastAverage = struct();
+
+            if obj.View.averageRunsEnabled()
+                nRuns = obj.View.runsToAverage();
+            else
+                nRuns = 1;
+            end
+            if nRuns >= 2
+                obj.View.setAverageRunProgress(1, nRuns);
+            end
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
             % cannot stay greyed out after an interrupt.
@@ -103,31 +115,53 @@ classdef AppController < handle
                 if strcmp(obj.Model.getSimulationStatus(), 'stopped')
                     errordlg("Model failed to enter real-time execution", "Target Error");
                 else
-                    obj.Model.startSimulation();
-                    obj.View.updateResponsePlot([], []);
+                    acc = AppController.emptyAverage();
+                    for k = 1:nRuns
+                        if obj.StopRequested
+                            break;
+                        end
 
-                    tRun = tic;
-                    runLimit = obj.Model.S + timeout_s;
+                        if nRuns >= 2
+                            obj.View.setAverageRunProgress(k, nRuns);
+                            drawnow;
+                        end
 
-                    while ~obj.StopRequested ...
-                            && obj.Model.isSimulationRunning() ...
-                            && toc(tRun) < runLimit
-                        obj.plotLiveResponse();
-                        % pause already flushes graphics. Extra drawnow here
-                        % plus yyaxis/xlim on uiaxes causes SceneTree
-                        % replaceChild warnings.
-                        pause(0.1);
+                        obj.Model.startSimulation();
+                        if k == 1
+                            obj.View.updateResponsePlot([], []);
+                        end
+
+                        tRun = tic;
+                        runLimit = obj.Model.S + timeout_s;
+
+                        while ~obj.StopRequested ...
+                                && obj.Model.isSimulationRunning() ...
+                                && toc(tRun) < runLimit
+                            obj.plotLiveResponse();
+                            % pause already flushes graphics. Extra drawnow here
+                            % plus yyaxis/xlim on uiaxes causes SceneTree
+                            % replaceChild warnings.
+                            pause(0.1);
+                        end
+
+                        if obj.StopRequested || obj.Model.isSimulationRunning()
+                            obj.Model.haltKernel();
+                        end
+
+                        obj.waitUntilStopped(5);
+                        pause(0.2);
+                        acc = obj.accumulateRun(acc);
+                        obj.plotAccumulated(acc);
+
+                        if obj.StopRequested
+                            break;
+                        end
+                        if k < nRuns
+                            % SLDRT needs a beat after halt before the next
+                            % start will take; no extra progress dialog.
+                            obj.pauseInterruptible(1.0);
+                        end
                     end
-
-                    if obj.StopRequested || obj.Model.isSimulationRunning()
-                        obj.Model.stopSimulation();
-                    end
-
-                    pause(0.2);
-                    obj.plotLoggedResponse();
-                    obj.plotResponseFft();
-                    obj.plotFrf();
-                    obj.plotControlsBode();
                 end
 
             catch ME
@@ -231,6 +265,7 @@ classdef AppController < handle
         function restoreIdleUi(obj)
             obj.View.setSimLampRunning(false);
             obj.View.setAppEnabled(true);
+            obj.View.clearAverageRunProgress();
         end
 
         function tf = dialogCancelRequested(~, d)
@@ -299,9 +334,8 @@ classdef AppController < handle
         function plotFrf(obj)
             [tF, f] = obj.Model.getLoggedForcing();
             [tX, x] = obj.Model.getLoggedResponse();
-            showCoherence = obj.View.averageRunsEnabled();
-            result = FrfAnalyzer.compute(tF, f, tX, x, showCoherence);
-            obj.View.updateFrf(result, showCoherence);
+            result = FrfAnalyzer.compute(tF, f, tX, x, false);
+            obj.View.updateFrf(result, false);
         end
 
         function spec = fftFromTimeseries(~, ts)
@@ -313,6 +347,147 @@ classdef AppController < handle
             y = squeeze(ts.Data);
             y = y(:);
             spec = FftAnalyzer.compute(t, y);
+        end
+
+        function waitUntilStopped(obj, timeout_s)
+            t0 = tic;
+            while obj.Model.isSimulationRunning() && toc(t0) < timeout_s
+                if obj.StopRequested
+                    return;
+                end
+                pause(0.05);
+                drawnow;
+            end
+        end
+
+        function pauseInterruptible(obj, seconds)
+            t0 = tic;
+            while toc(t0) < seconds
+                if obj.StopRequested
+                    return;
+                end
+                pause(0.05);
+                drawnow;
+            end
+        end
+
+        function acc = accumulateRun(obj, acc)
+            [tY, y] = obj.Model.getLoggedResponse();
+            if ~isempty(tY) && ~isempty(y)
+                acc.tResp{end+1} = tY(:);
+                acc.yResp{end+1} = y(:);
+            end
+
+            [tErr, yErr] = obj.Model.getLiveError();
+            if ~isempty(tErr) && ~isempty(yErr)
+                acc.tErr{end+1} = tErr(:);
+                acc.yErr{end+1} = yErr(:);
+            end
+
+            [tEff, yEff] = obj.Model.getLiveControlEffort();
+            if ~isempty(tEff) && ~isempty(yEff)
+                acc.tEff{end+1} = tEff(:);
+                acc.yEff{end+1} = yEff(:);
+            end
+
+            [tU, u] = obj.Model.getLoggedForcing();
+            acc.forceSpec{end+1} = FftAnalyzer.compute(tU, u);
+            acc.respSpec{end+1} = FftAnalyzer.compute(tY, y);
+            acc.bodeSpec{end+1} = FftAnalyzer.fromInputOutput(tU, u, tY, y);
+            acc.frfSpec{end+1} = FrfAnalyzer.compute(tU, u, tY, y, false);
+            acc.n = acc.n + 1;
+        end
+
+        function plotAccumulated(obj, acc)
+            [tY, y] = AppController.meanSignals(acc.tResp, acc.yResp);
+            if ~isempty(tY)
+                obj.View.updateResponsePlot(tY, y);
+            end
+
+            [tErr, yErr] = AppController.meanSignals(acc.tErr, acc.yErr);
+            if ~isempty(tErr)
+                obj.View.updateControlsError(tErr, yErr);
+            end
+
+            [tEff, yEff] = AppController.meanSignals(acc.tEff, acc.yEff);
+            if ~isempty(tEff)
+                obj.View.updateControlsEffort(tEff, yEff);
+            end
+
+            [tRef, yRef] = obj.Model.getLoggedForcing();
+            if ~isempty(tRef)
+                obj.View.updateControlsReferenceInput(tRef, yRef);
+            end
+
+            obj.View.updateForcingFft(FftAnalyzer.average(acc.forceSpec));
+            obj.View.updateResponseFft(FftAnalyzer.average(acc.respSpec));
+            obj.View.updateControlsBode(FftAnalyzer.average(acc.bodeSpec));
+
+            frf = FrfAnalyzer.average(acc.frfSpec);
+            nFrf = 0;
+            for i = 1:numel(acc.frfSpec)
+                if ~isempty(acc.frfSpec{i}) && isfield(acc.frfSpec{i}, 'n') ...
+                        && acc.frfSpec{i}.n > 0
+                    nFrf = nFrf + 1;
+                end
+            end
+            obj.View.updateFrf(frf, nFrf >= 2);
+
+            obj.Model.LastAverage = struct( ...
+                "n", acc.n, ...
+                "t", tY, ...
+                "y", y, ...
+                "t_error", tErr, ...
+                "error", yErr, ...
+                "t_effort", tEff, ...
+                "control_effort", yEff, ...
+                "frf", frf);
+        end
+    end
+
+    methods (Static, Access = private)
+        function acc = emptyAverage()
+            acc = struct( ...
+                "n", 0, ...
+                "tResp", {{}}, ...
+                "yResp", {{}}, ...
+                "tErr", {{}}, ...
+                "yErr", {{}}, ...
+                "tEff", {{}}, ...
+                "yEff", {{}}, ...
+                "forceSpec", {{}}, ...
+                "respSpec", {{}}, ...
+                "bodeSpec", {{}}, ...
+                "frfSpec", {{}});
+        end
+
+        function [tMean, yMean] = meanSignals(tCell, yCell)
+            tMean = [];
+            yMean = [];
+            n = min(numel(tCell), numel(yCell));
+            idx = [];
+            for i = 1:n
+                if ~isempty(tCell{i}) && ~isempty(yCell{i}) ...
+                        && numel(tCell{i}) >= 2 && numel(yCell{i}) >= 2
+                    idx(end+1) = i; %#ok<AGROW>
+                end
+            end
+            if isempty(idx)
+                return;
+            end
+            t0 = tCell{idx(1)}(:);
+            y0 = yCell{idx(1)}(:);
+            m = min(numel(t0), numel(y0));
+            tGrid = t0(1:m);
+            acc = zeros(size(tGrid));
+            for i = idx
+                ti = tCell{i}(:);
+                yi = yCell{i}(:);
+                mi = min(numel(ti), numel(yi));
+                acc = acc + interp1(ti(1:mi), yi(1:mi), tGrid, 'linear', 'extrap');
+            end
+            tMean = tGrid;
+            yMean = acc / numel(idx);
         end
     end
 end

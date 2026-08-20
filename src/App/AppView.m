@@ -141,6 +141,18 @@ classdef AppView < handle
             tf = obj.Sidebar.averageRunsEnabled();
         end
 
+        function n = runsToAverage(obj)
+            n = obj.Sidebar.runsToAverage();
+        end
+
+        function setAverageRunProgress(obj, currentRun, nRuns)
+            obj.Sidebar.setAverageRunProgress(currentRun, nRuns);
+        end
+
+        function clearAverageRunProgress(obj)
+            obj.Sidebar.clearAverageRunProgress();
+        end
+
         function updateResponsePlot(obj, t, y)
             obj.TimeDomainPanel.updateResponsePlot(t, y);
             obj.ControlsPanel.updateDisplacement(t, y);

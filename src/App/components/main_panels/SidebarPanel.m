@@ -23,6 +23,7 @@ classdef SidebarPanel < handle
         BSimEditField
         EnableSimParamButton
 
+        RunsToAverageLabel
         RunsToAverageEditField
         EnableAverageRunsButton
 
@@ -153,13 +154,11 @@ classdef SidebarPanel < handle
             AverageRunsPanel.Layout.Row = [8, 11];
 
             AverageRunsGrid = uigridlayout(AverageRunsPanel, [3, 2]);
-            AverageRunsGrid.ColumnWidth = {'fit', '1x'};
-            AverageRunsGrid.RowHeight = {22, 28, '1x'};
 
-            RunsToAverageLabel = uilabel(AverageRunsGrid, ...
+            obj.RunsToAverageLabel = uilabel(AverageRunsGrid, ...
                 "Text", "Runs to Average");
-            RunsToAverageLabel.Layout.Column = 1;
-            RunsToAverageLabel.Layout.Row = 1;
+            obj.RunsToAverageLabel.Layout.Column = 1;
+            obj.RunsToAverageLabel.Layout.Row = 1;
 
             obj.RunsToAverageEditField = uieditfield(AverageRunsGrid, 'numeric');
             obj.RunsToAverageEditField.Limits = [1, Inf];
@@ -184,7 +183,7 @@ classdef SidebarPanel < handle
             obj.EnableAverageRunsButton.Layout.Row = 2;
 
             AveragingHelp = uilabel(AverageRunsGrid, ...
-                "Text", "*Splits forcing function signal into # of Averages segments and outputs each segment individually. Coherence is shown only when averaging is enabled.", ...
+                "Text", "*Repeats the current forcing function N times and plots the running average after each run. Coherence is shown when N is at least 2.", ...
                 "WordWrap", "on", ...
                 "FontSize", 11, ...
                 "FontAngle", "italic");
@@ -333,6 +332,24 @@ classdef SidebarPanel < handle
 
         function tf = averageRunsEnabled(obj)
             tf = logical(obj.EnableAverageRunsButton.Value);
+        end
+
+        function setAverageRunProgress(obj, currentRun, nRuns)
+            if nargin < 3 || isempty(currentRun) || currentRun < 1
+                obj.clearAverageRunProgress();
+                return;
+            end
+            obj.RunsToAverageEditField.Visible = 'off';
+            obj.RunsToAverageLabel.Text = sprintf('Simulation %d/%d', currentRun, nRuns);
+            obj.RunsToAverageLabel.FontWeight = 'bold';
+            obj.RunsToAverageLabel.Layout.Column = [1, 2];
+        end
+
+        function clearAverageRunProgress(obj)
+            obj.RunsToAverageLabel.Layout.Column = 1;
+            obj.RunsToAverageLabel.Text = "Runs to Average";
+            obj.RunsToAverageLabel.FontWeight = 'normal';
+            obj.RunsToAverageEditField.Visible = 'on';
         end
 
         function enableControlCallback(obj, event)

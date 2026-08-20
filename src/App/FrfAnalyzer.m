@@ -1,7 +1,7 @@
 classdef FrfAnalyzer
     % Input/output FRF and coherence. compute() aligns two time series,
-    % forms H = X/F from full-record FFTs. Ordinary coherence is optional
-    % (Welch) and is only computed when averaging is enabled.
+    % forms H = X/F from full-record FFTs. Ensemble coherence is computed
+    % by average() when two or more runs are combined.
     %
     %{
     Example usage:
@@ -47,6 +47,8 @@ classdef FrfAnalyzer
             result.fs = specF.fs;
             result.freq = specF.freq;
             result.complex = H;
+            result.forceComplex = F;
+            result.responseComplex = X;
             result.mag = abs(H);
             result.phase = FrfAnalyzer.wrapPhaseDeg(rad2deg(angle(H)));
             if nargin >= 5 && logical(computeCoherence)
@@ -58,10 +60,80 @@ classdef FrfAnalyzer
             result.xLim = FftAnalyzer.displayXLim();
         end
 
+        function result = average(results)
+            % H1 estimate across runs: Gxy/Gxx on the first frequency grid.
+            % Ordinary coherence is filled only when two or more runs exist.
+            result = FrfAnalyzer.emptyResult();
+            if nargin < 1 || isempty(results)
+                return;
+            end
+            if iscell(results)
+                results = [results{:}];
+            end
+            results = results([results.n] > 0);
+            if isempty(results)
+                return;
+            end
+            if isscalar(results)
+                result = results(1);
+                result.coherence = NaN(size(result.freq));
+                return;
+            end
+
+            freq = results(1).freq(:);
+            Gxx = zeros(size(freq));
+            Gyy = zeros(size(freq));
+            Gxy = zeros(size(freq));
+            nUsed = 0;
+            for i = 1:numel(results)
+                [Fi, Yi] = FrfAnalyzer.runSpectraOnGrid(results(i), freq);
+                if isempty(Fi)
+                    continue;
+                end
+                Gxx = Gxx + abs(Fi).^2;
+                Gyy = Gyy + abs(Yi).^2;
+                Gxy = Gxy + conj(Fi) .* Yi;
+                nUsed = nUsed + 1;
+            end
+            if nUsed == 0
+                return;
+            end
+
+            Gxx = Gxx / nUsed;
+            Gyy = Gyy / nUsed;
+            Gxy = Gxy / nUsed;
+            scale = max(Gxx(isfinite(Gxx)));
+            H = Gxy ./ Gxx;
+            if isempty(scale) || ~(scale > 0)
+                H(:) = NaN;
+            else
+                weak = ~isfinite(Gxx) | Gxx < 1e-6 * scale;
+                H(weak | ~isfinite(H)) = NaN;
+            end
+
+            result.freq = freq;
+            result.complex = H;
+            result.forceComplex = sqrt(Gxx);
+            result.responseComplex = Gxy ./ max(sqrt(Gxx), eps);
+            result.mag = abs(H);
+            result.phase = FrfAnalyzer.wrapPhaseDeg(rad2deg(angle(H)));
+            den = Gxx .* Gyy;
+            coh = abs(Gxy).^2 ./ den;
+            coh(~isfinite(coh) | den <= 0) = NaN;
+            coh = min(max(coh, 0), 1);
+            coh(isnan(H)) = NaN;
+            result.coherence = coh;
+            result.fs = results(1).fs;
+            result.n = max([results.n]);
+            result.xLim = FftAnalyzer.displayXLim();
+        end
+
         function result = emptyResult()
             result = struct( ...
                 "freq", zeros(0, 1), ...
                 "complex", zeros(0, 1), ...
+                "forceComplex", zeros(0, 1), ...
+                "responseComplex", zeros(0, 1), ...
                 "mag", zeros(0, 1), ...
                 "phase", zeros(0, 1), ...
                 "coherence", zeros(0, 1), ...
@@ -72,6 +144,36 @@ classdef FrfAnalyzer
     end
 
     methods (Static, Access = private)
+        function [F, Y] = runSpectraOnGrid(result, freq)
+            F = [];
+            Y = [];
+            if isfield(result, 'forceComplex') && isfield(result, 'responseComplex') ...
+                    && ~isempty(result.forceComplex) && ~isempty(result.responseComplex)
+                F = result.forceComplex(:);
+                Y = result.responseComplex(:);
+                fi = result.freq(:);
+                if numel(F) ~= numel(freq) ...
+                        || numel(fi) ~= numel(freq) ...
+                        || any(abs(fi - freq) > 1e-12 * max(1, max(freq)))
+                    F = interp1(fi, F, freq, 'linear', NaN);
+                    Y = interp1(fi, Y, freq, 'linear', NaN);
+                end
+                return;
+            end
+            if isempty(result.complex)
+                return;
+            end
+            H = result.complex(:);
+            fi = result.freq(:);
+            if numel(H) ~= numel(freq) ...
+                    || numel(fi) ~= numel(freq) ...
+                    || any(abs(fi - freq) > 1e-12 * max(1, max(freq)))
+                H = interp1(fi, H, freq, 'linear', NaN);
+            end
+            F = ones(size(freq));
+            Y = H;
+        end
+
         function [t, u, y] = alignPair(tF, f, tX, x)
             % Put both traces on the response clock (or force clock if
             % response has no time). Same idea as lab_3 min-length truncate

@@ -53,6 +53,7 @@ classdef AppModel < handle
         EffortTimeBuffer  (1,:) double = [];
         EffortBuffer      (1,:) double = [];
         ForcingSignal           % timeseries object from SignalBuilder
+        LastAverage = struct()  % cumulative average after a multi-run batch
 
         % External-mode upload buffer (samples). At T=0.001 this is 0.05 s.
         LiveBufferSamples (1,1) double = 50;
@@ -294,6 +295,12 @@ classdef AppModel < handle
             obj.disconnectTargetQuietly();
         end
 
+        function haltKernel(obj)
+            % Stop the current run but keep the external-mode connection
+            % so the next average can start without rebuilding.
+            obj.stopTargetQuietly();
+        end
+
         function run = collectRunData(obj)
             names = [ ...
                 "rt_time", "f_input", "error", "control_effort", ...
@@ -310,6 +317,15 @@ classdef AppModel < handle
                 name = char(names(i));
                 if evalin('base', ['exist(''' name ''', ''var'')'])
                     run.(name) = evalin('base', name);
+                end
+            end
+
+            run.n_runs_averaged = 0;
+            if ~isempty(obj.LastAverage) && isfield(obj.LastAverage, 'n')
+                run.n_runs_averaged = obj.LastAverage.n;
+                run.averaged_cart1_position = obj.LastAverage;
+                if isfield(obj.LastAverage, 'frf')
+                    run.averaged_frf = obj.LastAverage.frf;
                 end
             end
         end
