@@ -80,6 +80,7 @@ classdef TimePanel < handle
             ylabel(obj.ReferencePlot, 'Force (N)');
 
             yyaxis(obj.ResponsePlot, 'left');
+            hold(obj.ResponsePlot, 'on');
             obj.OverlaySameAxisHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
             obj.OverlaySameAxisHandle.Visible = 'off';
             obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
@@ -90,6 +91,7 @@ classdef TimePanel < handle
             obj.applyResponseYLim();
 
             yyaxis(obj.ResponsePlot, 'right');
+            hold(obj.ResponsePlot, 'on');
             obj.OverlayDualAxisHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
             obj.OverlayDualAxisHandle.Visible = 'off';
             obj.ResponsePlot.YAxis(2).Label.String = 'Force (N)';
@@ -144,6 +146,44 @@ classdef TimePanel < handle
             set(obj.RespLineHandle, 'XData', t, 'YData', y);
             obj.applyResponseXLim(t);
         end
+
+        function applyOverlay(obj)
+            obj.ensureOverlayLines();
+
+            overlayOn = logical(obj.OverlayCheckBox.Value);
+            dual = overlayOn && obj.usesDualOverlay();
+            t = obj.RefLineHandle.XData;
+            y = obj.RefLineHandle.YData;
+
+            yyaxis(obj.ResponsePlot, 'left');
+            obj.ResponsePlot.YAxis(1).Label.String = 'Displacement (mm)';
+            obj.ResponsePlot.XColor = [0 0 0];
+            if overlayOn && ~dual
+                set(obj.OverlaySameAxisHandle, 'XData', t, 'YData', y, 'Visible', 'on');
+                obj.ResponsePlot.YAxis(1).Color = [0 0 0];
+            else
+                set(obj.OverlaySameAxisHandle, 'Visible', 'off');
+                if dual
+                    obj.ResponsePlot.YAxis(1).Color = [1 0 0];
+                else
+                    obj.ResponsePlot.YAxis(1).Color = [0 0 0];
+                end
+            end
+
+            yyaxis(obj.ResponsePlot, 'right');
+            if dual
+                set(obj.OverlayDualAxisHandle, 'XData', t, 'YData', y, 'Visible', 'on');
+                obj.ResponsePlot.YAxis(2).Color = [0 0 1];
+                obj.ResponsePlot.YAxis(2).Label.String = obj.ReferenceQuantity.PlotYLabel;
+                obj.ResponsePlot.YAxis(2).Visible = 'on';
+            else
+                set(obj.OverlayDualAxisHandle, 'Visible', 'off');
+                obj.ResponsePlot.YAxis(2).Visible = 'off';
+            end
+
+            yyaxis(obj.ResponsePlot, 'left');
+            obj.applyResponseXLim();
+        end
     end
 
     methods (Access = private)
@@ -155,37 +195,18 @@ classdef TimePanel < handle
             end
         end
 
-        function applyOverlay(obj)
-            if ~isvalid(obj.OverlaySameAxisHandle) || ~isvalid(obj.OverlayDualAxisHandle)
-                return;
+        function ensureOverlayLines(obj)
+            yyaxis(obj.ResponsePlot, 'left');
+            hold(obj.ResponsePlot, 'on');
+            if isempty(obj.OverlaySameAxisHandle) || ~isvalid(obj.OverlaySameAxisHandle)
+                obj.OverlaySameAxisHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
             end
-
-            obj.OverlaySameAxisHandle.Visible = 'off';
-            obj.OverlayDualAxisHandle.Visible = 'off';
-            obj.ResponsePlot.YAxis(2).Visible = 'off';
-            obj.ResponsePlot.YAxis(1).Label.String = 'Displacement (mm)';
-            obj.ResponsePlot.XColor = [0 0 0];
-
-            if ~obj.OverlayCheckBox.Value
-                obj.ResponsePlot.YAxis(1).Color = [0 0 0];
-                obj.applyResponseXLim();
-                return;
+            yyaxis(obj.ResponsePlot, 'right');
+            hold(obj.ResponsePlot, 'on');
+            if isempty(obj.OverlayDualAxisHandle) || ~isvalid(obj.OverlayDualAxisHandle)
+                obj.OverlayDualAxisHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
             end
-
-            t = obj.RefLineHandle.XData;
-            y = obj.RefLineHandle.YData;
-
-            if obj.usesDualOverlay()
-                set(obj.OverlayDualAxisHandle, 'XData', t, 'YData', y, 'Visible', 'on');
-                obj.ResponsePlot.YAxis(1).Color = [1 0 0];
-                obj.ResponsePlot.YAxis(2).Color = [0 0 1];
-                obj.ResponsePlot.YAxis(2).Label.String = obj.ReferenceQuantity.PlotYLabel;
-                obj.ResponsePlot.YAxis(2).Visible = 'on';
-            else
-                set(obj.OverlaySameAxisHandle, 'XData', t, 'YData', y, 'Visible', 'on');
-                obj.ResponsePlot.YAxis(1).Color = [0 0 0];
-            end
-            obj.applyResponseXLim();
+            yyaxis(obj.ResponsePlot, 'left');
         end
 
         function tf = usesDualOverlay(obj)
