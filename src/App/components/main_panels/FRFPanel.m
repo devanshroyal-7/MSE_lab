@@ -30,7 +30,7 @@ classdef FRFPanel < handle
             title(obj.AxMag, "FRF Magnitude", "FontWeight", "bold", "FontSize", 17);
             obj.AxMag.TitleHorizontalAlignment = "left";
             xlabel(obj.AxMag, 'Frequency (Hz)');
-            ylabel(obj.AxMag, 'Magnitude (m/N)');
+            ylabel(obj.AxMag, 'Magnitude (mm/N)');
             hold(obj.AxMag, "on");
 
             obj.AxPhase = uiaxes(obj.MainLayoutGrid, "XGrid", "on", "YGrid", "on");

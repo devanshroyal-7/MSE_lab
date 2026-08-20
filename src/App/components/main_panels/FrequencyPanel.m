@@ -35,7 +35,7 @@ classdef FrequencyPanel < handle
             obj.MainLayoutGrid.RowSpacing = 5;
 
             obj.AxForcingMag = obj.createPlotCell(1, 1, "Magnitude (N)");
-            obj.AxResponseMag = obj.createPlotCell(1, 2, "Magnitude (m)");
+            obj.AxResponseMag = obj.createPlotCell(1, 2, "Magnitude (mm)");
             obj.AxForcingPhase = obj.createPlotCell(2, 1, "Phase (deg)");
             obj.AxResponsePhase = obj.createPlotCell(2, 2, "Phase (deg)");
 

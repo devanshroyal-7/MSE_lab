@@ -32,9 +32,9 @@ classdef ControlsPanel < handle
             obj.MainLayoutGrid.RowHeight = {'1x', '1x'};
             obj.MainLayoutGrid.RowSpacing = 5;
 
-            obj.AxDisplacement = obj.createPlotCell(1, 1, "Displacement (m)");
+            obj.AxDisplacement = obj.createPlotCell(1, 1, "Displacement (mm)");
             obj.AxReferenceInput = obj.createPlotCell(1, 2, "Force (N)");
-            obj.AxError = obj.createPlotCell(2, 1, "Error (m)");
+            obj.AxError = obj.createPlotCell(2, 1, "Error (mm)");
             obj.AxEffort = obj.createPlotCell(2, 2, "Control Effort (N)");
 
             obj.DisplacementLine = plot(obj.AxDisplacement, NaN, NaN, 'r-', LineWidth=1.5);
