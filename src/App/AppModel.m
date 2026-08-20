@@ -212,12 +212,13 @@ classdef AppModel < handle
                 return;
             end
             [t, y] = obj.readWorkspaceNamed('cart1_position');
+            y = AppModel.metersToMm(y);
         end
 
         function [t, y] = getLiveCart1Position(obj)
             obj.captureLiveCart1Chunk();
             t = obj.TimeBuffer(:);
-            y = obj.PositionBuffer(:);
+            y = AppModel.metersToMm(obj.PositionBuffer(:));
         end
 
         function [t, y] = getLiveFInput(obj)
@@ -230,7 +231,7 @@ classdef AppModel < handle
             obj.captureLiveNamedChunk('error', 'error', ...
                 'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
             t = obj.ErrorTimeBuffer(:);
-            y = obj.ErrorBuffer(:);
+            y = AppModel.metersToMm(obj.ErrorBuffer(:));
         end
 
         function [t, y] = getLiveControlEffort(obj)
@@ -507,6 +508,14 @@ classdef AppModel < handle
     end
 
     methods (Static, Access = private)
+        function yMm = metersToMm(y)
+            if isempty(y)
+                yMm = y;
+                return;
+            end
+            yMm = y * 1000;
+        end
+
         function [t, y] = signalValuesToXY(vals)
             t = [];
             y = [];
