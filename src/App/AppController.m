@@ -58,11 +58,13 @@ classdef AppController < handle
             obj.View.setSimLampRunning(true);
             obj.Model.prepareNewRun();
             obj.View.updateResponsePlot([], []);
+            obj.View.setResponseStatus("");
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
             obj.View.clearFrf();
             obj.View.clearControlsBode();
             obj.View.showLiveResponseScope(1 / obj.Model.T);
+            obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope());
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
             % cannot stay greyed out after an interrupt.
@@ -254,7 +256,12 @@ classdef AppController < handle
         function plotLoggedResponse(obj)
             [t, y] = obj.Model.getKernelLoggedResponse();
             if ~isempty(t) && ~isempty(y)
+                obj.View.setResponseStatus("");
                 obj.View.updateResponsePlot(t, y);
+            else
+                obj.View.updateResponsePlot([], []);
+                obj.View.setResponseStatus( ...
+                    "No kernel log (~S/T samples). Last ExtMode dump ignored.");
             end
             [tRef, yRef] = obj.Model.getLoggedForcing();
             if ~isempty(tRef) && ~isempty(yRef)

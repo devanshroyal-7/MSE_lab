@@ -163,7 +163,7 @@ classdef TimePanel < handle
 
         function showLiveTimeScope(obj, sampleRate)
             % Hide Response uiaxes and put a fresh uitimescope in the same
-            % grid cell. The plant owner binds cart1_position to this handle.
+            % grid cell. AppModel.connectLiveTimeScope binds EMB port 3.
             if nargin < 2 || isempty(sampleRate) || ~(sampleRate > 0)
                 sampleRate = 1000;
             end
@@ -194,7 +194,7 @@ classdef TimePanel < handle
             try
                 scope.Title = 'Response (live)';
                 scope.XLabel = 'Time (s)';
-                scope.YLabel = 'Displacement (mm)';
+                scope.YLabel = 'Displacement (m)';
                 scope.XTimeSpan = max(0.1, obj.SimDuration);
                 scope.PlotType = 'line';
             catch
@@ -215,6 +215,19 @@ classdef TimePanel < handle
             obj.teardownTimeScope();
             if ~isempty(obj.ResponsePlot) && isvalid(obj.ResponsePlot)
                 obj.ResponsePlot.Visible = 'on';
+            end
+        end
+
+        function setResponseStatus(obj, message)
+            if isempty(obj.ResponsePlot) || ~isvalid(obj.ResponsePlot)
+                return;
+            end
+            if nargin < 2 || strlength(string(message)) == 0
+                title(obj.ResponsePlot, "Response Plot", ...
+                    "FontWeight", "bold", "FontSize", 17);
+            else
+                title(obj.ResponsePlot, string(message), ...
+                    "FontWeight", "bold", "FontSize", 14);
             end
         end
 

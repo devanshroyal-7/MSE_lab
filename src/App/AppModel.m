@@ -2,22 +2,18 @@ classdef AppModel < handle
     % Application model: loads MSE_PLANT and feeds forcing / sim parameters
     % into the MATLAB base workspace so Desktop Real-Time can read them.
     %
-    % Live Time-tab display is a uitimescope (wired by the plant owner).
-    % After Stop, getKernelLoggedResponse() loads the full kernel-side log
-    % once — File Log, then SDI, then logsout, then base-workspace variables.
-    % It does not stitch ExtMode Duration chunks.
+    % Live Time-tab display is uitimescope bound to EMB Cart1-Position [m]
+    % (port 3). After Stop, getKernelLoggedResponse() waits for a complete
+    % SDI / logsout / SLDRT archive record (~t_span/T samples). ExtMode
+    % To Workspace leftovers (tens of samples) are ignored, not plotted.
+    % This plant is Simulink Desktop Real-Time (sldrt.tlc), not Speedgoat
+    % slrealtime — there is no slrealtime.fileLogImport.
     %
-    % Plant log contract (base workspace / File Log / SDI / logsout):
-    %   rt_time            [s]   plant clock, length ~S/T
-    %   cart1_position     [m]   cart 1 displacement (app plots mm)
-    %   cart2_position     [m]
-    %   cart1_velocity     [m/s]
-    %   cart2_velocity     [m/s]
-    %   f_input            [N]   commanded/applied force at the plant
-    %   error              [m]   tracking error (closed loop)
-    %   control_effort     [N]
-    %   motor_current, motor_velocity
-    % SDI aliases: Cart1-Position, Cart2-Position, Cart1-Velocity, Cart2-Velocity.
+    % Plant log contract:
+    %   Block  MSE_PLANT/EMB - Spring-Mass-Damper System 2DOF - DAQ2(NI PCIe-6321)1
+    %   Port 3 Cart1-Position [m]  (already instrumented in the .slx)
+    %   Clock  MSE_PLANT/Clock1 → To Workspace rt_time
+    %   To Workspace names: rt_time, cart1_position [m], … (ExtMode-duration dumps only)
     %
     %{
     Example usage:
@@ -76,6 +72,7 @@ classdef AppModel < handle
         StaleSdiRunIds = []
         AuxLogs = struct()
         KernelLogsLoaded (1,1) logical = false
+        TimeScopeBinding
     end
 
     events
@@ -202,8 +199,8 @@ classdef AppModel < handle
 
         function [t, y] = getKernelLoggedResponse(obj)
             % Full post-run cart-1 trace for TimePanel uiaxes.
-            % t [s], y [mm]. Source is File Log / SDI / logsout / workspace
-            % (rt_time, cart1_position in meters). Not ExtMode 50-sample dumps.
+            % t [s], y [mm]. Only a complete kernel record (SDI / logsout /
+            % SLDRT archive with ~t_span/T samples). Not ExtMode leftovers.
             obj.ensureKernelLogsLoaded();
             t = obj.TimeBuffer(:);
             y = AppModel.metersToMm(obj.PositionBuffer(:));
@@ -244,16 +241,16 @@ classdef AppModel < handle
             set_param(modelName, 'SimulationCommand', 'connect');
         end
 
-        function connectLiveTimeScope(obj, scope) %#ok<INUSD>
-            % Hook for kernel / SDI / File Log live connection.
-            % TimePanel owns the uitimescope; bind the plant signal here.
+        function connectLiveTimeScope(obj, scope)
+            % Bind uitimescope to EMB Cart1-Position [m] (output port 3).
             %
-            % Expected logged signal: cart1_position [m] on clock rt_time [s].
-            % Typical R2024a+ Simulink binding (normal sim, not SLDRT-specific):
-            %   simObj = simulation(char(obj.SimulationModelName));
-            %   bind(simObj.LoggedSignals, ...
-            %       obj.SimulationModelName + "/<Cart1 block path>:1", scope);
-            % SLDRT Instrument / File Log streaming is wired by the plant owner.
+            % One-time .slx: keep the log badge on that port (already in
+            % MSE_PLANT) and Signal logging ON. SLDRT has no File Log block;
+            % live data is SDI streaming of the instrumented signal.
+            % The bound signal is meters — live scope ylabel is meters.
+            %
+            %   bind(simulation('MSE_PLANT').LoggedSignals, ...
+            %       'MSE_PLANT/<EMB block>:3', scope)
             if nargin < 2 || isempty(scope)
                 return;
             end
@@ -262,6 +259,49 @@ classdef AppModel < handle
                     return;
                 end
             catch
+                return;
+            end
+
+            obj.releaseTimeScopeBinding();
+            modelName = char(obj.SimulationModelName);
+            [blk, port] = obj.cart1PositionBlock();
+            sigPath = sprintf('%s:%d', blk, port);
+
+            try
+                Simulink.sdi.markSignalForStreaming(blk, port, 'on');
+            catch
+            end
+            try
+                set_param(modelName, 'SignalLogging', 'on');
+            catch
+            end
+
+            try
+                obj.Simulation = simulation(modelName);
+            catch ME
+                warning('AppModel:NoSimulationObject', ...
+                    ['Could not create simulation(''%s'') for uitimescope bind: %s'], ...
+                    modelName, ME.message);
+                return;
+            end
+
+            bound = false;
+            try
+                obj.TimeScopeBinding = bind(obj.Simulation.LoggedSignals, sigPath, scope);
+                bound = true;
+            catch
+            end
+            if ~bound
+                try
+                    obj.TimeScopeBinding = bind(obj.Simulation.LoggedSignals, ...
+                        sigPath, scope, '');
+                    bound = true;
+                catch ME
+                    warning('AppModel:TimeScopeBindFailed', ...
+                        ['Could not bind uitimescope to %s. Enable Signal ', ...
+                         'logging on EMB port %d (Cart1-Position [m]). %s'], ...
+                        sigPath, port, ME.message);
+                end
             end
         end
 
@@ -313,14 +353,38 @@ classdef AppModel < handle
         end
 
         function loadKernelLoggedSignals(obj)
-            % One-shot import of the complete kernel log after StopTime.
-            % Preference: File Log import, then SDI, then logsout, then
-            % base-workspace rt_time / cart1_position (meters).
-            pause(0.5);
-            drawnow;
-            obj.tryImportFileLog();
+            % Wait for a complete kernel record after StopTime.
+            % SLDRT (sldrt.tlc) has no slrealtime.fileLogImport. Sources:
+            % instrumented SDI (Cart1-Position), logsout, optional ExtMode
+            % data-archiving MAT files. To Workspace dumps of tens of
+            % samples are ExtMode leftovers and are not plotted.
+            t0 = tic;
+            t = [];
+            y = [];
+            while toc(t0) < 8
+                obj.tryImportSldrtArchive();
+                [t, y] = obj.readKernelNamed('cart1_position', 'Cart1-Position');
+                if obj.isCompleteSeries(t, y)
+                    break;
+                end
+                pause(0.25);
+                drawnow;
+            end
 
-            [t, y] = obj.readKernelNamed('cart1_position', 'Cart1-Position');
+            if ~obj.isCompleteSeries(t, y)
+                obj.TimeBuffer = [];
+                obj.PositionBuffer = [];
+                obj.ForcingTimeBuffer = [];
+                obj.ForcingBuffer = [];
+                obj.ErrorTimeBuffer = [];
+                obj.ErrorBuffer = [];
+                obj.EffortTimeBuffer = [];
+                obj.EffortBuffer = [];
+                obj.initAuxLogs();
+                obj.KernelLogsLoaded = true;
+                return;
+            end
+
             obj.TimeBuffer = t(:)';
             obj.PositionBuffer = y(:)';
 
@@ -421,19 +485,71 @@ classdef AppModel < handle
             end
         end
 
+        function releaseTimeScopeBinding(obj)
+            b = obj.TimeScopeBinding;
+            obj.TimeScopeBinding = [];
+            if isempty(b)
+                return;
+            end
+            try
+                delete(b);
+            catch
+            end
+        end
+
+        function [blk, port] = cart1PositionBlock(obj)
+            % EMB subsystem output 3 is Cart1-Position [m].
+            port = 3;
+            modelName = char(obj.SimulationModelName);
+            fallback = [modelName ...
+                '/EMB - Spring-Mass-Damper System 2DOF - DAQ2(NI PCIe-6321)1'];
+            blk = fallback;
+            try
+                hits = find_system(modelName, 'SearchDepth', 1, ...
+                    'Regexp', 'on', 'Name', '^EMB');
+                if isempty(hits)
+                    return;
+                end
+                if iscell(hits)
+                    hits = hits{1};
+                end
+                blk = char(hits);
+            catch
+            end
+        end
+
         function ensureKernelLogsLoaded(obj)
             if ~obj.KernelLogsLoaded
                 obj.loadKernelLoggedSignals();
             end
         end
 
-        function tryImportFileLog(obj)
-            % Typical SLDRT / SLRT File Log import. Fails quietly if the
-            % plant does not use File Log or the function is absent.
+        function tryImportSldrtArchive(obj)
+            % Speedgoat File Log is slrealtime.fileLogImport — not used here.
+            % SLDRT Run-in-Kernel can archive ExtMode buffers to MAT files
+            % when Data Archiving is enabled in the External Mode Control Panel.
             modelName = char(obj.SimulationModelName);
             try
-                if exist('slrealtime.fileLogImport', 'file')
-                    slrealtime.fileLogImport(modelName);
+                if ~bdIsLoaded(modelName)
+                    return;
+                end
+                if ~strcmp(get_param(modelName, 'ExtModeEnableArchive'), 'on')
+                    return;
+                end
+                dirName = get_param(modelName, 'ExtModeArchiveDirName');
+                filePrefix = get_param(modelName, 'ExtModeArchiveFileName');
+                if isempty(dirName)
+                    dirName = pwd;
+                end
+                files = dir(fullfile(dirName, [filePrefix '*.mat']));
+                if isempty(files)
+                    return;
+                end
+                [~, newest] = max([files.datenum]);
+                data = load(fullfile(files(newest).folder, files(newest).name));
+                names = fieldnames(data);
+                for i = 1:numel(names)
+                    assignin('base', names{i}, data.(names{i}));
                 end
             catch
             end
@@ -463,13 +579,11 @@ classdef AppModel < handle
         end
 
         function [bestT, bestY] = pickBestSeries(obj, candidates)
-            % Choose one complete kernel record. Do not merge chunks.
+            % Choose one complete kernel record. Never fall back to a
+            % short ExtMode To Workspace dump (e.g. 23 samples).
             bestT = [];
             bestY = [];
-            bestN = -1;
             completeN = -1;
-            completeT = [];
-            completeY = [];
             for i = 1:numel(candidates)
                 ti = candidates{i}{1};
                 yi = candidates{i}{2};
@@ -481,26 +595,16 @@ classdef AppModel < handle
                 yi = yi(1:n);
                 if obj.isCompleteSeries(ti, yi) && n > completeN
                     completeN = n;
-                    completeT = ti;
-                    completeY = yi;
-                end
-                if n > bestN
-                    bestN = n;
                     bestT = ti;
                     bestY = yi;
                 end
             end
-            if ~isempty(completeY)
-                bestT = completeT;
-                bestY = completeY;
-            end
-        end
-
-        function n = expectedSampleCount(obj)
-            n = max(2, round(obj.S / obj.T));
         end
 
         function tf = isCompleteSeries(obj, t, y)
+            % True when the series is dense at sample time T from t≈0.
+            % Rejects last ExtMode To Workspace buffers (tens of samples).
+            % Allows an early Stop whose span is shorter than commanded S.
             tf = false;
             n = min(numel(t), numel(y));
             if n < 2
@@ -510,10 +614,12 @@ classdef AppModel < handle
             if t(1) > max(2 * obj.T, 0.05)
                 return;
             end
-            if t(end) < obj.S - 2 * obj.T
+            span = t(end) - t(1);
+            if span < max(0.2, 20 * obj.T)
                 return;
             end
-            if n < obj.expectedSampleCount() - 2
+            expectedForSpan = max(2, round(span / obj.T));
+            if n < expectedForSpan - max(2, 0.1 * expectedForSpan)
                 return;
             end
             tf = true;

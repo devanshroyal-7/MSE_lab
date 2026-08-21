@@ -154,6 +154,10 @@ classdef AppView < handle
             obj.TimeDomainPanel.restoreResponseAxes();
         end
 
+        function setResponseStatus(obj, message)
+            obj.TimeDomainPanel.setResponseStatus(message);
+        end
+
         function scope = getResponseTimeScope(obj)
             scope = obj.TimeDomainPanel.getResponseTimeScope();
         end
