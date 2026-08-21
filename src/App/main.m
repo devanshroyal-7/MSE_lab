@@ -20,7 +20,7 @@ function main()
 
     delete(timerfindall);             % close any leftover timers from a previous run
 
-    fig = uifigure("Name", "Mechanical System Experimenation App", "Position", [500, 500, 1900, 900]);
+    fig = uifigure("Name", "Mechanical System Experimenation App", "Position", [100, 100, 1900, 1000]);
 
     model       = AppModel();
     view        = AppView(fig);
