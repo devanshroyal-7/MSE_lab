@@ -30,11 +30,14 @@ classdef TimePanel < handle
         % Cached line handles so streaming can set XData/YData without new plot()
         RefLineHandle
         RespLineHandle
+        RespLine2Handle
         OverlaySameAxisHandle
         OverlayDualAxisHandle
         ReferenceQuantity
         SimDuration (1,1) double = 0.1
         ResponseYLimits (1,2) double = [-20, 20]
+        ShowCart1 (1,1) logical = true
+        ShowCart2 (1,1) logical = false
     end
     methods
         function obj = TimePanel(parentContainer)
@@ -97,7 +100,12 @@ classdef TimePanel < handle
             obj.OverlaySameAxisHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
             obj.OverlaySameAxisHandle.Visible = 'off';
             obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, '-', ...
-                'Color', [0.85 0.15 0.15], LineWidth=1.5);
+                'Color', CartPlotStyle.color(1), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(1));
+            obj.RespLine2Handle = plot(obj.ResponsePlot, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(2), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(2));
+            obj.RespLine2Handle.Visible = 'off';
             xlabel(obj.ResponsePlot, 'Time (s)');
             obj.ResponsePlot.YAxis(1).Label.String = 'Displacement (mm)';
             obj.ResponsePlot.YAxis(1).Color = [0 0 0];
@@ -149,24 +157,40 @@ classdef TimePanel < handle
             obj.applyOverlay();
         end
 
-        function updateResponsePlot(obj, t, y)
-            if ~isvalid(obj.RespLineHandle)
+        function updateResponsePlot(obj, t, y, cart)
+            if nargin < 4 || isempty(cart)
+                cart = 1;
+            end
+            yyaxis(obj.ResponsePlot, 'left');
+            h = obj.responseLine(cart);
+            if isempty(h) || ~isvalid(h)
                 return;
             end
             if isempty(t) || isempty(y)
-                set(obj.RespLineHandle, 'XData', NaN, 'YData', NaN);
+                set(h, 'XData', NaN, 'YData', NaN);
+                obj.applyCartVisibility();
                 obj.applyResponseXLim();
                 return;
             end
-            set(obj.RespLineHandle, 'XData', t, 'YData', y);
+            set(h, 'XData', t, 'YData', y);
+            obj.applyCartVisibility();
             obj.applyResponseXLim(t);
         end
 
-        function showLiveTimeScope(obj, sampleRate)
+        function setCartVisible(obj, showCart1, showCart2)
+            obj.ShowCart1 = logical(showCart1);
+            obj.ShowCart2 = logical(showCart2);
+            obj.applyCartVisibility();
+        end
+
+        function showLiveTimeScope(obj, sampleRate, cart)
             % Hide Response uiaxes and put a fresh uitimescope in the same
-            % grid cell. AppModel.connectLiveTimeScope binds EMB port 3.
+            % grid cell. AppModel.connectLiveTimeScope binds the selected cart.
             if nargin < 2 || isempty(sampleRate) || ~(sampleRate > 0)
                 sampleRate = 1000;
+            end
+            if nargin < 3 || isempty(cart)
+                cart = 1;
             end
             obj.teardownTimeScope();
             obj.ResponsePlot.Visible = 'off';
@@ -193,7 +217,7 @@ classdef TimePanel < handle
             scope.Layout.Row = 1;
             scope.Layout.Column = 1;
             try
-                scope.Title = 'Response (live)';
+                scope.Title = sprintf('Response (live) — Cart %d', cart);
                 scope.XLabel = 'Time (s)';
                 scope.YLabel = 'Displacement (m)';
                 scope.XTimeSpan = max(0.1, obj.SimDuration);
@@ -209,7 +233,7 @@ classdef TimePanel < handle
                 scope.BufferLength = nBuf;
             catch
             end
-            obj.applyTimeScopeLineColor(scope);
+            obj.applyTimeScopeLineColor(scope, cart);
             obj.ResponseTimeScope = scope;
         end
 
@@ -273,6 +297,7 @@ classdef TimePanel < handle
 
             yyaxis(obj.ResponsePlot, 'left');
             obj.applyResponseXLim();
+            obj.applyCartVisibility();
         end
     end
 
@@ -302,6 +327,42 @@ classdef TimePanel < handle
         function tf = usesDualOverlay(obj)
             tf = isempty(obj.ReferenceQuantity) || obj.ReferenceQuantity.Mode == "force";
         end
+
+        function applyCartVisibility(obj)
+            if ~isempty(obj.RespLineHandle) && isvalid(obj.RespLineHandle)
+                obj.RespLineHandle.Visible = CartPlotStyle.onOff(obj.ShowCart1);
+            end
+            if ~isempty(obj.RespLine2Handle) && isvalid(obj.RespLine2Handle)
+                obj.RespLine2Handle.Visible = CartPlotStyle.onOff(obj.ShowCart2);
+            end
+            if ~isempty(obj.ResponsePlot) && isvalid(obj.ResponsePlot)
+                CartPlotStyle.applyLegend(obj.ResponsePlot, ...
+                    obj.RespLineHandle, obj.RespLine2Handle, ...
+                    obj.ShowCart1, obj.ShowCart2);
+            end
+        end
+
+        function h = responseLine(obj, cart)
+            if cart == 2
+                h = obj.RespLine2Handle;
+            else
+                h = obj.RespLineHandle;
+            end
+        end
+
+        function t = responseTimeForXLim(obj)
+            t = [];
+            if obj.ShowCart1 && CartPlotStyle.lineHasData(obj.RespLineHandle)
+                t = obj.RespLineHandle.XData;
+            elseif obj.ShowCart2 && CartPlotStyle.lineHasData(obj.RespLine2Handle)
+                t = obj.RespLine2Handle.XData;
+            elseif CartPlotStyle.lineHasData(obj.RespLineHandle)
+                t = obj.RespLineHandle.XData;
+            elseif CartPlotStyle.lineHasData(obj.RespLine2Handle)
+                t = obj.RespLine2Handle.XData;
+            end
+        end
+
         function applyResponseXLim(obj, t)
             if obj.AutoscaleCheckBox.Value
                 obj.setXLimIfChanged(obj.ResponsePlot, [0, obj.SimDuration]);
@@ -309,7 +370,7 @@ classdef TimePanel < handle
             end
 
             if nargin < 2 || isempty(t)
-                t = obj.RespLineHandle.XData;
+                t = obj.responseTimeForXLim();
             end
             if isempty(t) || all(isnan(t))
                 xEnd = obj.SimDuration;
@@ -341,10 +402,12 @@ classdef TimePanel < handle
             end
         end
 
-        function applyTimeScopeLineColor(~, scope)
-            % Default uitimescope channel color is yellow. Match the
-            % post-run Response line ([0.85 0.15 0.15]).
-            rgb = [0.85 0.15 0.15];
+        function applyTimeScopeLineColor(~, scope, cart)
+            % Match the post-run Response line for the live cart.
+            if nargin < 3 || isempty(cart)
+                cart = 1;
+            end
+            rgb = CartPlotStyle.color(cart);
             names = {'LineColor', 'PlotColor', 'ChannelColor', 'SignalColor'};
             for i = 1:numel(names)
                 try

@@ -59,7 +59,8 @@ classdef AppController < handle
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
             obj.Model.prepareNewRun();
-            obj.View.updateResponsePlot([], []);
+            obj.View.updateResponsePlot([], [], 1);
+            obj.View.updateResponsePlot([], [], 2);
             obj.View.setResponseStatus("");
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
@@ -75,8 +76,9 @@ classdef AppController < handle
             if nRuns >= 2
                 obj.View.setAverageRunProgress(1, nRuns);
             end
-            obj.View.showLiveResponseScope(1 / obj.Model.T);
-            obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope());
+            liveCart = obj.View.livePlotCart();
+            obj.View.showLiveResponseScope(1 / obj.Model.T, liveCart);
+            obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope(), liveCart);
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
             % cannot stay greyed out after an interrupt.
@@ -135,7 +137,7 @@ classdef AppController < handle
                         % because SLDRT does not reattach LoggedSignals.
                         if k == 1
                             obj.Model.connectLiveTimeScope( ...
-                                obj.View.getResponseTimeScope());
+                                obj.View.getResponseTimeScope(), liveCart);
                         end
                         obj.Model.startSimulation();
 
@@ -294,14 +296,15 @@ classdef AppController < handle
         end
 
         function plotLoggedResponse(obj)
-            [t, y] = obj.Model.getKernelLoggedResponse();
-            if ~isempty(t) && ~isempty(y)
-                obj.View.setResponseStatus("");
-                obj.View.updateResponsePlot(t, y);
-            else
-                obj.View.updateResponsePlot([], []);
+            [t1, y1] = obj.Model.getKernelLoggedCartPosition(1);
+            obj.View.updateResponsePlot(t1, y1, 1);
+            [t2, y2] = obj.Model.getKernelLoggedCartPosition(2);
+            obj.View.updateResponsePlot(t2, y2, 2);
+            if isempty(t1) && isempty(t2)
                 obj.View.setResponseStatus( ...
                     "No kernel log (~S/T samples). Last ExtMode dump ignored.");
+            else
+                obj.View.setResponseStatus("");
             end
             [tRef, yRef] = obj.Model.getLoggedForcing();
             if ~isempty(tRef) && ~isempty(yRef)
@@ -326,23 +329,26 @@ classdef AppController < handle
         end
 
         function plotResponseFft(obj)
-            [t, x] = obj.Model.getLoggedResponse();
-            spec = FftAnalyzer.compute(t, x);
-            obj.View.updateResponseFft(spec);
+            [t1, x1] = obj.Model.getKernelLoggedCartPosition(1);
+            obj.View.updateResponseFft(FftAnalyzer.compute(t1, x1), 1);
+            [t2, x2] = obj.Model.getKernelLoggedCartPosition(2);
+            obj.View.updateResponseFft(FftAnalyzer.compute(t2, x2), 2);
         end
 
         function plotControlsBode(obj)
-            [tY, y] = obj.Model.getLoggedResponse();
             [tU, u] = obj.Model.getLoggedForcing();
-            H = FftAnalyzer.fromInputOutput(tU, u, tY, y);
-            obj.View.updateControlsBode(H);
+            [t1, y1] = obj.Model.getKernelLoggedCartPosition(1);
+            obj.View.updateControlsBode(FftAnalyzer.fromInputOutput(tU, u, t1, y1), 1);
+            [t2, y2] = obj.Model.getKernelLoggedCartPosition(2);
+            obj.View.updateControlsBode(FftAnalyzer.fromInputOutput(tU, u, t2, y2), 2);
         end
 
         function plotFrf(obj)
             [tF, f] = obj.Model.getLoggedForcing();
-            [tX, x] = obj.Model.getLoggedResponse();
-            result = FrfAnalyzer.compute(tF, f, tX, x, false);
-            obj.View.updateFrf(result, false);
+            [t1, x1] = obj.Model.getKernelLoggedCartPosition(1);
+            obj.View.updateFrf(FrfAnalyzer.compute(tF, f, t1, x1, false), false, 1);
+            [t2, x2] = obj.Model.getKernelLoggedCartPosition(2);
+            obj.View.updateFrf(FrfAnalyzer.compute(tF, f, t2, x2, false), false, 2);
         end
 
         function spec = fftFromTimeseries(~, ts)
@@ -379,10 +385,16 @@ classdef AppController < handle
         end
 
         function acc = accumulateRun(obj, acc)
-            [tY, y] = obj.Model.getKernelLoggedResponse();
-            if ~isempty(tY) && ~isempty(y)
-                acc.tResp{end+1} = tY(:);
-                acc.yResp{end+1} = y(:);
+            [t1, y1] = obj.Model.getKernelLoggedCartPosition(1);
+            if ~isempty(t1) && ~isempty(y1)
+                acc.tResp1{end+1} = t1(:);
+                acc.yResp1{end+1} = y1(:);
+            end
+
+            [t2, y2] = obj.Model.getKernelLoggedCartPosition(2);
+            if ~isempty(t2) && ~isempty(y2)
+                acc.tResp2{end+1} = t2(:);
+                acc.yResp2{end+1} = y2(:);
             end
 
             [tErr, yErr] = obj.Model.getKernelLoggedError();
@@ -399,17 +411,21 @@ classdef AppController < handle
 
             [tU, u] = obj.Model.getLoggedForcing();
             acc.forceSpec{end+1} = FftAnalyzer.compute(tU, u);
-            acc.respSpec{end+1} = FftAnalyzer.compute(tY, y);
-            acc.bodeSpec{end+1} = FftAnalyzer.fromInputOutput(tU, u, tY, y);
-            acc.frfSpec{end+1} = FrfAnalyzer.compute(tU, u, tY, y, false);
+            acc.respSpec1{end+1} = FftAnalyzer.compute(t1, y1);
+            acc.respSpec2{end+1} = FftAnalyzer.compute(t2, y2);
+            acc.bodeSpec1{end+1} = FftAnalyzer.fromInputOutput(tU, u, t1, y1);
+            acc.bodeSpec2{end+1} = FftAnalyzer.fromInputOutput(tU, u, t2, y2);
+            acc.frfSpec1{end+1} = FrfAnalyzer.compute(tU, u, t1, y1, false);
+            acc.frfSpec2{end+1} = FrfAnalyzer.compute(tU, u, t2, y2, false);
             acc.n = acc.n + 1;
         end
 
         function plotAccumulated(obj, acc)
-            [tY, y] = AppController.meanSignals(acc.tResp, acc.yResp);
-            if ~isempty(tY)
-                obj.View.updateResponsePlot(tY, y);
-            end
+            [t1, y1] = AppController.meanSignals(acc.tResp1, acc.yResp1);
+            obj.View.updateResponsePlot(t1, y1, 1);
+
+            [t2, y2] = AppController.meanSignals(acc.tResp2, acc.yResp2);
+            obj.View.updateResponsePlot(t2, y2, 2);
 
             [tErr, yErr] = AppController.meanSignals(acc.tErr, acc.yErr);
             if ~isempty(tErr)
@@ -427,19 +443,18 @@ classdef AppController < handle
             end
 
             obj.View.updateForcingFft(FftAnalyzer.average(acc.forceSpec));
-            obj.View.updateResponseFft(FftAnalyzer.average(acc.respSpec));
-            obj.View.updateControlsBode(FftAnalyzer.average(acc.bodeSpec));
+            obj.View.updateResponseFft(FftAnalyzer.average(acc.respSpec1), 1);
+            obj.View.updateResponseFft(FftAnalyzer.average(acc.respSpec2), 2);
+            obj.View.updateControlsBode(FftAnalyzer.average(acc.bodeSpec1), 1);
+            obj.View.updateControlsBode(FftAnalyzer.average(acc.bodeSpec2), 2);
 
-            frf = FrfAnalyzer.average(acc.frfSpec);
-            nFrf = 0;
-            for i = 1:numel(acc.frfSpec)
-                if ~isempty(acc.frfSpec{i}) && isfield(acc.frfSpec{i}, 'n') ...
-                        && acc.frfSpec{i}.n > 0
-                    nFrf = nFrf + 1;
-                end
-            end
-            obj.View.updateFrf(frf, nFrf >= 2);
-            if isempty(tY)
+            frf1 = FrfAnalyzer.average(acc.frfSpec1);
+            frf2 = FrfAnalyzer.average(acc.frfSpec2);
+            nFrf = AppController.countNonemptyFrf(acc.frfSpec1);
+            showCoherence = nFrf >= 2;
+            obj.View.updateFrf(frf1, showCoherence, 1);
+            obj.View.updateFrf(frf2, showCoherence, 2);
+            if isempty(t1) && isempty(t2)
                 obj.View.setResponseStatus( ...
                     "No kernel log (~S/T samples). Last ExtMode dump ignored.");
             else
@@ -448,13 +463,16 @@ classdef AppController < handle
 
             obj.Model.LastAverage = struct( ...
                 "n", acc.n, ...
-                "t", tY, ...
-                "y", y, ...
+                "t", t1, ...
+                "y", y1, ...
+                "t2", t2, ...
+                "y2", y2, ...
                 "t_error", tErr, ...
                 "error", yErr, ...
                 "t_effort", tEff, ...
                 "control_effort", yEff, ...
-                "frf", frf);
+                "frf", frf1, ...
+                "frf2", frf2);
         end
     end
 
@@ -462,16 +480,31 @@ classdef AppController < handle
         function acc = emptyAverage()
             acc = struct( ...
                 "n", 0, ...
-                "tResp", {{}}, ...
-                "yResp", {{}}, ...
+                "tResp1", {{}}, ...
+                "yResp1", {{}}, ...
+                "tResp2", {{}}, ...
+                "yResp2", {{}}, ...
                 "tErr", {{}}, ...
                 "yErr", {{}}, ...
                 "tEff", {{}}, ...
                 "yEff", {{}}, ...
                 "forceSpec", {{}}, ...
-                "respSpec", {{}}, ...
-                "bodeSpec", {{}}, ...
-                "frfSpec", {{}});
+                "respSpec1", {{}}, ...
+                "respSpec2", {{}}, ...
+                "bodeSpec1", {{}}, ...
+                "bodeSpec2", {{}}, ...
+                "frfSpec1", {{}}, ...
+                "frfSpec2", {{}});
+        end
+
+        function n = countNonemptyFrf(frfSpec)
+            n = 0;
+            for i = 1:numel(frfSpec)
+                if ~isempty(frfSpec{i}) && isfield(frfSpec{i}, 'n') ...
+                        && frfSpec{i}.n > 0
+                    n = n + 1;
+                end
+            end
         end
 
         function [tMean, yMean] = meanSignals(tCell, yCell)

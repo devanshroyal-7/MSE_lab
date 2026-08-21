@@ -3,8 +3,9 @@ classdef AppModel < handle
     % into the MATLAB base workspace so Desktop Real-Time can read them.
     %
     % Live Time-tab display is uitimescope bound to EMB Cart1-Position [m]
-    % (port 3). After Stop, getKernelLoggedResponse() waits for a complete
-    % SDI / logsout / SLDRT archive record (~t_span/T samples). ExtMode
+    % (port 3) or Cart2-Position [m] (port 4) from Plot Controls. After Stop,
+    % getKernelLoggedCartPosition() waits for a complete SDI / logsout /
+    % SLDRT archive record (~t_span/T samples). ExtMode
     % To Workspace leftovers (tens of samples) are ignored, not plotted.
     % This plant is Simulink Desktop Real-Time (sldrt.tlc), not Speedgoat
     % slrealtime — there is no slrealtime.fileLogImport.
@@ -214,13 +215,29 @@ classdef AppModel < handle
             % Full post-run cart-1 trace for TimePanel uiaxes.
             % t [s], y [mm]. Only a complete kernel record (SDI / logsout /
             % SLDRT archive with ~t_span/T samples). Not ExtMode leftovers.
-            obj.ensureKernelLogsLoaded();
-            t = obj.TimeBuffer(:);
-            y = AppModel.metersToMm(obj.PositionBuffer(:));
+            [t, y] = obj.getKernelLoggedCartPosition(1);
         end
 
         function [t, y] = getLoggedResponse(obj)
             [t, y] = obj.getKernelLoggedResponse();
+        end
+
+        function [t, y] = getKernelLoggedCartPosition(obj, cart)
+            % Post-run cart displacement. cart is 1 or 2. t [s], y [mm].
+            obj.ensureKernelLogsLoaded();
+            if nargin < 2 || isempty(cart) || cart ~= 2
+                t = obj.TimeBuffer(:);
+                y = AppModel.metersToMm(obj.PositionBuffer(:));
+                return;
+            end
+            t = [];
+            y = [];
+            if ~isfield(obj.AuxLogs, 'cart2_position')
+                return;
+            end
+            log = obj.AuxLogs.cart2_position;
+            t = log.t(:);
+            y = AppModel.metersToMm(log.y(:));
         end
 
         function [t, y] = getKernelLoggedError(obj)
@@ -254,8 +271,9 @@ classdef AppModel < handle
             set_param(modelName, 'SimulationCommand', 'connect');
         end
 
-        function connectLiveTimeScope(obj, scope)
-            % Bind uitimescope to EMB Cart1-Position [m] (output port 3).
+        function connectLiveTimeScope(obj, scope, cart)
+            % Bind uitimescope to EMB Cart-Position [m].
+            % cart 1 → port 3, cart 2 → port 4. Default cart 1.
             %
             % One-time .slx: keep the log badge on that port (already in
             % MSE_PLANT) and Signal logging ON. SLDRT has no File Log block;
@@ -277,7 +295,11 @@ classdef AppModel < handle
 
             obj.releaseTimeScopeBinding();
             modelName = char(obj.SimulationModelName);
-            [blk, port] = obj.cart1PositionBlock();
+            if nargin >= 3 && cart == 2
+                [blk, port] = obj.cart2PositionBlock();
+            else
+                [blk, port] = obj.cart1PositionBlock();
+            end
             sigPath = sprintf('%s:%d', blk, port);
 
             obj.markKernelSignalsForStreaming();
@@ -309,7 +331,7 @@ classdef AppModel < handle
                 catch ME
                     warning('AppModel:TimeScopeBindFailed', ...
                         ['Could not bind uitimescope to %s. Enable Signal ', ...
-                         'logging on EMB port %d (Cart1-Position [m]). %s'], ...
+                         'logging on EMB port %d (Cart-Position [m]). %s'], ...
                         sigPath, port, ME.message);
                 end
             end
@@ -451,6 +473,9 @@ classdef AppModel < handle
                 if isfield(obj.LastAverage, 'frf')
                     run.averaged_frf = obj.LastAverage.frf;
                 end
+                if isfield(obj.LastAverage, 'frf2')
+                    run.averaged_frf_cart2 = obj.LastAverage.frf2;
+                end
             end
         end
 
@@ -526,6 +551,12 @@ classdef AppModel < handle
         function [blk, port] = cart1PositionBlock(obj)
             % EMB subsystem output 3 is Cart1-Position [m].
             port = 3;
+            blk = obj.embBlockPath();
+        end
+
+        function [blk, port] = cart2PositionBlock(obj)
+            % EMB subsystem output 4 is Cart2-Position [m].
+            port = 4;
             blk = obj.embBlockPath();
         end
 

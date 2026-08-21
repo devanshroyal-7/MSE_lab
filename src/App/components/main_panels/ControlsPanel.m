@@ -21,9 +21,12 @@ classdef ControlsPanel < handle
         AxEffort
 
         DisplacementLine
+        DisplacementLine2
         ReferenceInputLine
         ErrorLine
         EffortLine
+        ShowCart1 (1,1) logical = true
+        ShowCart2 (1,1) logical = false
     end
     methods
         function obj = ControlsPanel(parentContainer)
@@ -37,7 +40,14 @@ classdef ControlsPanel < handle
             obj.AxError = obj.createPlotCell(2, 1, "Error (mm)");
             obj.AxEffort = obj.createPlotCell(2, 2, "Control Effort (N)");
 
-            obj.DisplacementLine = plot(obj.AxDisplacement, NaN, NaN, 'r-', LineWidth=1.5);
+            hold(obj.AxDisplacement, "on");
+            obj.DisplacementLine = plot(obj.AxDisplacement, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(1), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(1));
+            obj.DisplacementLine2 = plot(obj.AxDisplacement, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(2), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(2));
+            obj.DisplacementLine2.Visible = 'off';
             obj.ReferenceInputLine = plot(obj.AxReferenceInput, NaN, NaN, 'b-', LineWidth=1.5);
             obj.ErrorLine = plot(obj.AxError, NaN, NaN, 'r-', LineWidth=1.5);
             obj.EffortLine = plot(obj.AxEffort, NaN, NaN, 'b-', LineWidth=1.5);
@@ -52,8 +62,23 @@ classdef ControlsPanel < handle
             obj.AxEffort.TitleHorizontalAlignment = "left";
         end
 
-        function updateDisplacement(obj, t, y)
-            obj.setTimeLine(obj.AxDisplacement, obj.DisplacementLine, t, y);
+        function updateDisplacement(obj, t, y, cart)
+            if nargin < 4 || isempty(cart)
+                cart = 1;
+            end
+            if cart == 2
+                h = obj.DisplacementLine2;
+            else
+                h = obj.DisplacementLine;
+            end
+            obj.setTimeLine(obj.AxDisplacement, h, t, y);
+            obj.applyCartVisibility();
+        end
+
+        function setCartVisible(obj, showCart1, showCart2)
+            obj.ShowCart1 = logical(showCart1);
+            obj.ShowCart2 = logical(showCart2);
+            obj.applyCartVisibility();
         end
 
         function updateReferenceInput(obj, t, y)
@@ -74,7 +99,8 @@ classdef ControlsPanel < handle
         end
 
         function clearPlots(obj)
-            obj.updateDisplacement([], []);
+            obj.updateDisplacement([], [], 1);
+            obj.updateDisplacement([], [], 2);
             obj.updateReferenceInput([], []);
             obj.updateError([], []);
             obj.updateEffort([], []);
@@ -107,6 +133,18 @@ classdef ControlsPanel < handle
             if abs(cur(1)) > 1e-9 || abs(cur(2) - xEnd) > 1e-9
                 ax.XLim = [0, xEnd];
             end
+        end
+
+        function applyCartVisibility(obj)
+            if ~isempty(obj.DisplacementLine) && isvalid(obj.DisplacementLine)
+                obj.DisplacementLine.Visible = CartPlotStyle.onOff(obj.ShowCart1);
+            end
+            if ~isempty(obj.DisplacementLine2) && isvalid(obj.DisplacementLine2)
+                obj.DisplacementLine2.Visible = CartPlotStyle.onOff(obj.ShowCart2);
+            end
+            CartPlotStyle.applyLegend(obj.AxDisplacement, ...
+                obj.DisplacementLine, obj.DisplacementLine2, ...
+                obj.ShowCart1, obj.ShowCart2);
         end
     end
 end

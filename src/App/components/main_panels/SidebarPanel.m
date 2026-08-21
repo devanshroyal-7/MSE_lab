@@ -1,8 +1,8 @@
 classdef SidebarPanel < handle
-    % Right-hand controls: SLDRT start/stop, k_sim / c_sim, runs-to-average,
-    % open/closed loop, PID gains, Create Forcing Function, and Save Outputs.
-    % Start and Create Forcing Function forward to AppView; k/c and the
-    % simulated-parameter enable forward into AppModel.
+    % Right-hand controls: SLDRT start/stop, cart plot toggles, k_sim / c_sim,
+    % runs-to-average, open/closed loop, PID gains, Create Forcing Function,
+    % and Save Outputs. Start and Create Forcing Function forward to AppView;
+    % k/c and the simulated-parameter enable forward into AppModel.
     %
     %{
     Example usage:
@@ -22,6 +22,9 @@ classdef SidebarPanel < handle
         KSimEditField
         BSimEditField
         EnableSimParamButton
+
+        PlotCart1CheckBox
+        PlotCart2CheckBox
 
         RunsToAverageLabel
         RunsToAverageEditField
@@ -51,13 +54,14 @@ classdef SidebarPanel < handle
         fwdSimParamsChangedCallback
         fwdControlParamsChangedCallback
         fwdAverageRunsChangedCallback
+        fwdPlotCartsChangedCallback
     end
 
     methods
         function obj = SidebarPanel(parentContainer)
-            obj.MainLayoutGrid = uigridlayout(parentContainer, [20, 4]);
+            obj.MainLayoutGrid = uigridlayout(parentContainer, [22, 4]);
             obj.MainLayoutGrid.ColumnWidth = {'1x', '1x', '1x', '1x'};
-            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
+            obj.MainLayoutGrid.RowHeight = {30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, '1x', 30};
 
             %%% Real-time Simulation Controls %%%
             SimControlLabel = uilabel(obj.MainLayoutGrid, ...
@@ -98,12 +102,35 @@ classdef SidebarPanel < handle
             obj.SimStopButton.Layout.Column = [3, 4];
             obj.SimStopButton.Layout.Row = [2, 3];
 
+            %%% Plot Controls %%%
+            PlotControlsPanel = uipanel(obj.MainLayoutGrid, ...
+                "Title", "Plot Controls", ...
+                "FontWeight", "bold");
+            PlotControlsPanel.Layout.Column = [1, 4];
+            PlotControlsPanel.Layout.Row = [4, 5];
+
+            PlotControlsGrid = uigridlayout(PlotControlsPanel, [2, 1]);
+            PlotControlsGrid.RowHeight = {'1x', '1x'};
+            PlotControlsGrid.ColumnWidth = {'1x'};
+
+            obj.PlotCart1CheckBox = uicheckbox(PlotControlsGrid, ...
+                "Text", "Plot Cart 1 data", ...
+                "Value", true, ...
+                "ValueChangedFcn", @(~, ~) obj.plotCartsChanged());
+            obj.PlotCart1CheckBox.Layout.Row = 1;
+
+            obj.PlotCart2CheckBox = uicheckbox(PlotControlsGrid, ...
+                "Text", "Plot Cart 2 data", ...
+                "Value", false, ...
+                "ValueChangedFcn", @(~, ~) obj.plotCartsChanged());
+            obj.PlotCart2CheckBox.Layout.Row = 2;
+
             %%% Simulated Parameters %%%
             SimulatedParamsPanel = uipanel(obj.MainLayoutGrid, ...
                 "Title", "Simulated Parameters", ...
                 "FontWeight", "bold");
             SimulatedParamsPanel.Layout.Column = [1, 4];
-            SimulatedParamsPanel.Layout.Row = [4,7];
+            SimulatedParamsPanel.Layout.Row = [6, 9];
 
             SimParamGrid = uigridlayout(SimulatedParamsPanel, [3, 2]);
 
@@ -151,7 +178,7 @@ classdef SidebarPanel < handle
                 "Title", "Average Runs", ...
                 "FontWeight", "bold");
             AverageRunsPanel.Layout.Column = [1, 4];
-            AverageRunsPanel.Layout.Row = [8, 11];
+            AverageRunsPanel.Layout.Row = [10, 13];
 
             AverageRunsGrid = uigridlayout(AverageRunsPanel, [3, 2]);
 
@@ -195,7 +222,7 @@ classdef SidebarPanel < handle
                 "Title", "Control Parameters", ...
                 "FontWeight", "bold");
             obj.ControlParamPanel.Layout.Column = [1, 4];
-            obj.ControlParamPanel.Layout.Row = [12, 16];
+            obj.ControlParamPanel.Layout.Row = [14, 18];
 
             ControlParamGrid = uigridlayout(obj.ControlParamPanel, [4, 2]);
 
@@ -252,7 +279,7 @@ classdef SidebarPanel < handle
                 "Title", "Control Mode", ...
                 "FontWeight", "bold");
             obj.ControlModePanel.Layout.Column = [1, 4];
-            obj.ControlModePanel.Layout.Row = [17, 18];
+            obj.ControlModePanel.Layout.Row = [19, 20];
 
             ControlModeGrid = uigridlayout(obj.ControlModePanel, [1, 1]);
 
@@ -281,14 +308,28 @@ classdef SidebarPanel < handle
                 "Text","Create Forcing Function", ...
                 "ButtonPushedFcn", @(src, event) obj.createFcnCallback());
             obj.CreateFcnButton.Layout.Column = [1, 2];
-            obj.CreateFcnButton.Layout.Row = 20;
+            obj.CreateFcnButton.Layout.Row = 22;
 
             %%% Save Output Button %%%
             obj.SaveOutputButton = uibutton(obj.MainLayoutGrid, ...
                 "Text","Save Outputs", ...
                 "ButtonPushedFcn", @(src, event) obj.saveOutputCallback());
             obj.SaveOutputButton.Layout.Column = [3, 4];
-            obj.SaveOutputButton.Layout.Row = 20;
+            obj.SaveOutputButton.Layout.Row = 22;
+        end
+
+        function tf = plotCart1(obj)
+            tf = logical(obj.PlotCart1CheckBox.Value);
+        end
+
+        function tf = plotCart2(obj)
+            tf = logical(obj.PlotCart2CheckBox.Value);
+        end
+
+        function plotCartsChanged(obj)
+            if ~isempty(obj.fwdPlotCartsChangedCallback)
+                obj.fwdPlotCartsChangedCallback(obj.plotCart1(), obj.plotCart2());
+            end
         end
 
         function enableSimParamCallback(obj, event)
@@ -422,8 +463,8 @@ classdef SidebarPanel < handle
         function setControlPanelsVisible(obj, showParams, showMode)
             obj.ControlParamPanel.Visible = obj.onOff(showParams);
             obj.ControlModePanel.Visible = obj.onOff(showMode);
-            obj.setRowsHeight(12:16, showParams);
-            obj.setRowsHeight(17:18, showMode);
+            obj.setRowsHeight(14:18, showParams);
+            obj.setRowsHeight(19:20, showMode);
         end
 
         function setActionButtonsEnabled(obj, tf)

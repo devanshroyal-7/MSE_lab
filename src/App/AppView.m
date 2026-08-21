@@ -104,8 +104,10 @@ classdef AppView < handle
             obj.Sidebar.fwdSimParamsChangedCallback = @(k, b, enabled) obj.handleSimParamsChangedCallback(k, b, enabled);
             obj.Sidebar.fwdControlParamsChangedCallback = @(kp, ki, kd, closedLoop, enabled) obj.handleControlParamsChangedCallback(kp, ki, kd, closedLoop, enabled);
             obj.Sidebar.fwdAverageRunsChangedCallback = @(enabled) obj.handleAverageRunsChangedCallback(enabled);
+            obj.Sidebar.fwdPlotCartsChangedCallback = @(c1, c2) obj.setPlotCarts(c1, c2);
             obj.TabGroup.SelectionChangedFcn = @(src, event) obj.handleTabChanged();
             obj.handleTabChanged();
+            obj.setPlotCarts(obj.Sidebar.plotCart1(), obj.Sidebar.plotCart2());
         end
     
         function updateReferencePlot(obj, sim_input)
@@ -141,6 +143,28 @@ classdef AppView < handle
             tf = obj.Sidebar.averageRunsEnabled();
         end
 
+        function [show1, show2] = plotCartSelection(obj)
+            show1 = obj.Sidebar.plotCart1();
+            show2 = obj.Sidebar.plotCart2();
+        end
+
+        function cart = livePlotCart(obj)
+            [show1, show2] = obj.plotCartSelection();
+            if show2 && ~show1
+                cart = 2;
+            else
+                cart = 1;
+            end
+        end
+
+        function setPlotCarts(obj, showCart1, showCart2)
+            obj.TimeDomainPanel.setCartVisible(showCart1, showCart2);
+            obj.FFTPanel.setCartVisible(showCart1, showCart2);
+            obj.FRFPanel.setCartVisible(showCart1, showCart2);
+            obj.ControlsPanel.setCartVisible(showCart1, showCart2);
+            obj.ControlsFrequencyPanel.setCartVisible(showCart1, showCart2);
+        end
+
         function n = runsToAverage(obj)
             n = obj.Sidebar.runsToAverage();
         end
@@ -153,13 +177,19 @@ classdef AppView < handle
             obj.Sidebar.clearAverageRunProgress();
         end
 
-        function updateResponsePlot(obj, t, y)
-            obj.TimeDomainPanel.updateResponsePlot(t, y);
-            obj.ControlsPanel.updateDisplacement(t, y);
+        function updateResponsePlot(obj, t, y, cart)
+            if nargin < 4 || isempty(cart)
+                cart = 1;
+            end
+            obj.TimeDomainPanel.updateResponsePlot(t, y, cart);
+            obj.ControlsPanel.updateDisplacement(t, y, cart);
         end
 
-        function showLiveResponseScope(obj, sampleRate)
-            obj.TimeDomainPanel.showLiveTimeScope(sampleRate);
+        function showLiveResponseScope(obj, sampleRate, cart)
+            if nargin < 3 || isempty(cart)
+                cart = obj.livePlotCart();
+            end
+            obj.TimeDomainPanel.showLiveTimeScope(sampleRate, cart);
         end
 
         function restoreResponseAxes(obj)
@@ -190,17 +220,23 @@ classdef AppView < handle
             obj.ControlsPanel.clearPlots();
         end
 
-        function updateFftPlots(obj, forcingSpec, responseSpec)
+        function updateFftPlots(obj, forcingSpec, responseSpec, cart)
+            if nargin < 4 || isempty(cart)
+                cart = 1;
+            end
             obj.FFTPanel.updateForcing(forcingSpec);
-            obj.FFTPanel.updateResponse(responseSpec);
+            obj.FFTPanel.updateResponse(responseSpec, cart);
         end
 
         function updateForcingFft(obj, spec)
             obj.FFTPanel.updateForcing(spec);
         end
 
-        function updateResponseFft(obj, spec)
-            obj.FFTPanel.updateResponse(spec);
+        function updateResponseFft(obj, spec, cart)
+            if nargin < 3 || isempty(cart)
+                cart = 1;
+            end
+            obj.FFTPanel.updateResponse(spec, cart);
         end
 
         function clearFftPlots(obj)
@@ -212,14 +248,19 @@ classdef AppView < handle
         end
 
         function clearResponseFft(obj)
-            obj.FFTPanel.updateResponse(FftAnalyzer.emptySpectrum());
+            empty = FftAnalyzer.emptySpectrum();
+            obj.FFTPanel.updateResponse(empty, 1);
+            obj.FFTPanel.updateResponse(empty, 2);
         end
 
-        function updateFrf(obj, result, showCoherence)
+        function updateFrf(obj, result, showCoherence, cart)
             if nargin < 3
                 showCoherence = false;
             end
-            obj.FRFPanel.update(result, showCoherence);
+            if nargin < 4 || isempty(cart)
+                cart = 1;
+            end
+            obj.FRFPanel.update(result, showCoherence, cart);
         end
 
         function clearFrf(obj)
@@ -231,8 +272,11 @@ classdef AppView < handle
             obj.FRFPanel.clearCoherence();
         end
 
-        function updateControlsBode(obj, spec)
-            obj.ControlsFrequencyPanel.updateBode(spec);
+        function updateControlsBode(obj, spec, cart)
+            if nargin < 3 || isempty(cart)
+                cart = 1;
+            end
+            obj.ControlsFrequencyPanel.updateBode(spec, cart);
         end
 
         function clearControlsBode(obj)

@@ -19,6 +19,10 @@ classdef ControlsFrequencyPanel < handle
 
         MagLine
         PhaseLine
+        MagLine2
+        PhaseLine2
+        ShowCart1 (1,1) logical = true
+        ShowCart2 (1,1) logical = false
     end
     methods
         function obj = ControlsFrequencyPanel(parentContainer)
@@ -39,8 +43,22 @@ classdef ControlsFrequencyPanel < handle
             ylabel(obj.AxPhase, 'Phase (deg)');
             ylim(obj.AxPhase, [-180, 180]);
 
-            obj.MagLine = plot(obj.AxMag, NaN, NaN, 'b-', LineWidth=1.5);
-            obj.PhaseLine = plot(obj.AxPhase, NaN, NaN, 'b-', LineWidth=1.5);
+            hold(obj.AxMag, "on");
+            hold(obj.AxPhase, "on");
+            obj.MagLine = plot(obj.AxMag, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(1), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(1));
+            obj.PhaseLine = plot(obj.AxPhase, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(1), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(1));
+            obj.MagLine2 = plot(obj.AxMag, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(2), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(2));
+            obj.PhaseLine2 = plot(obj.AxPhase, NaN, NaN, '-', ...
+                'Color', CartPlotStyle.color(2), LineWidth=1.5, ...
+                'DisplayName', CartPlotStyle.label(2));
+            obj.MagLine2.Visible = 'off';
+            obj.PhaseLine2.Visible = 'off';
 
             title(obj.AxMag, "Bode Magnitude", "FontWeight", "bold", "FontSize", 17);
             title(obj.AxPhase, "Bode Phase", "FontWeight", "bold", "FontSize", 17);
@@ -48,13 +66,24 @@ classdef ControlsFrequencyPanel < handle
             obj.AxPhase.TitleHorizontalAlignment = "left";
         end
 
-        function updateBode(obj, spec)
-            if ~isvalid(obj.MagLine) || ~isvalid(obj.PhaseLine)
+        function updateBode(obj, spec, cart)
+            if nargin < 3 || isempty(cart)
+                cart = 1;
+            end
+            if cart == 2
+                magLine = obj.MagLine2;
+                phaseLine = obj.PhaseLine2;
+            else
+                magLine = obj.MagLine;
+                phaseLine = obj.PhaseLine;
+            end
+            if ~isvalid(magLine) || ~isvalid(phaseLine)
                 return;
             end
             if nargin < 2 || isempty(spec) || spec.n == 0 || isempty(spec.freq)
-                set(obj.MagLine, 'XData', NaN, 'YData', NaN);
-                set(obj.PhaseLine, 'XData', NaN, 'YData', NaN);
+                set(magLine, 'XData', NaN, 'YData', NaN);
+                set(phaseLine, 'XData', NaN, 'YData', NaN);
+                obj.applyCartVisibility();
                 return;
             end
 
@@ -67,16 +96,17 @@ classdef ControlsFrequencyPanel < handle
             phase = spec.phase(:);
             mask = freq > 0 & isfinite(magDb) & isfinite(phase);
             if ~any(mask)
-                set(obj.MagLine, 'XData', NaN, 'YData', NaN);
-                set(obj.PhaseLine, 'XData', NaN, 'YData', NaN);
+                set(magLine, 'XData', NaN, 'YData', NaN);
+                set(phaseLine, 'XData', NaN, 'YData', NaN);
+                obj.applyCartVisibility();
                 return;
             end
             freq = freq(mask);
             magDb = magDb(mask);
             phase = phase(mask);
 
-            set(obj.MagLine, 'XData', freq, 'YData', magDb);
-            set(obj.PhaseLine, 'XData', freq, 'YData', phase);
+            set(magLine, 'XData', freq, 'YData', magDb);
+            set(phaseLine, 'XData', freq, 'YData', phase);
             xLim = [freq(1), freq(end)];
             if xLim(2) <= xLim(1)
                 xLim(2) = xLim(1) * 10;
@@ -84,10 +114,37 @@ classdef ControlsFrequencyPanel < handle
             obj.AxMag.XLim = xLim;
             obj.AxPhase.XLim = xLim;
             obj.AxPhase.YLim = [-180, 180];
+            obj.applyCartVisibility();
+        end
+
+        function setCartVisible(obj, showCart1, showCart2)
+            obj.ShowCart1 = logical(showCart1);
+            obj.ShowCart2 = logical(showCart2);
+            obj.applyCartVisibility();
         end
 
         function clearPlots(obj)
-            obj.updateBode(FftAnalyzer.emptySpectrum());
+            obj.updateBode(FftAnalyzer.emptySpectrum(), 1);
+            obj.updateBode(FftAnalyzer.emptySpectrum(), 2);
+        end
+    end
+
+    methods (Access = private)
+        function applyCartVisibility(obj)
+            if ~isempty(obj.MagLine) && isvalid(obj.MagLine)
+                vis1 = CartPlotStyle.onOff(obj.ShowCart1);
+                obj.MagLine.Visible = vis1;
+                obj.PhaseLine.Visible = vis1;
+            end
+            if ~isempty(obj.MagLine2) && isvalid(obj.MagLine2)
+                vis2 = CartPlotStyle.onOff(obj.ShowCart2);
+                obj.MagLine2.Visible = vis2;
+                obj.PhaseLine2.Visible = vis2;
+            end
+            CartPlotStyle.applyLegend(obj.AxMag, obj.MagLine, obj.MagLine2, ...
+                obj.ShowCart1, obj.ShowCart2);
+            CartPlotStyle.applyLegend(obj.AxPhase, obj.PhaseLine, obj.PhaseLine2, ...
+                obj.ShowCart1, obj.ShowCart2);
         end
     end
 end
