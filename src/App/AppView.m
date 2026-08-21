@@ -158,37 +158,20 @@ classdef AppView < handle
             obj.ControlsPanel.updateDisplacement(t, y);
         end
 
-        function updateLivePlots(obj, t, y, tForce, yForce)
-            % Only touch axes on the visible tab. Updating hidden uiaxes
-            % from the live loop trips MATLAB's SceneTree replaceChild bug.
-            tab = obj.selectedTabTitle();
-            if tab == "Time"
-                if ~isempty(t)
-                    obj.TimeDomainPanel.updateResponsePlot(t, y);
-                end
-            elseif tab == "Controls - Time"
-                if ~isempty(t)
-                    obj.ControlsPanel.updateDisplacement(t, y);
-                end
-                if nargin >= 5 && ~isempty(tForce)
-                    obj.ControlsPanel.updateReferenceInput(tForce, yForce);
-                end
-            end
+        function showLiveResponseScope(obj, sampleRate)
+            obj.TimeDomainPanel.showLiveTimeScope(sampleRate);
         end
 
-        function updateLiveControlsPlots(obj, t, y, tRef, yRef, tErr, yErr, tEff, yEff)
-            if ~isempty(t)
-                obj.ControlsPanel.updateDisplacement(t, y);
-            end
-            if nargin >= 5 && ~isempty(tRef)
-                obj.ControlsPanel.updateReferenceInput(tRef, yRef);
-            end
-            if nargin >= 7 && ~isempty(tErr)
-                obj.ControlsPanel.updateError(tErr, yErr);
-            end
-            if nargin >= 9 && ~isempty(tEff)
-                obj.ControlsPanel.updateEffort(tEff, yEff);
-            end
+        function restoreResponseAxes(obj)
+            obj.TimeDomainPanel.restoreResponseAxes();
+        end
+
+        function setResponseStatus(obj, message)
+            obj.TimeDomainPanel.setResponseStatus(message);
+        end
+
+        function scope = getResponseTimeScope(obj)
+            scope = obj.TimeDomainPanel.getResponseTimeScope();
         end
 
         function updateControlsReferenceInput(obj, t, y)

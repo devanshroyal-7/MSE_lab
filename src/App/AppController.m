@@ -58,7 +58,9 @@ classdef AppController < handle
 
             obj.View.setAppEnabled(false);
             obj.View.setSimLampRunning(true);
+            obj.Model.prepareNewRun();
             obj.View.updateResponsePlot([], []);
+            obj.View.setResponseStatus("");
             obj.View.clearControlsTimePlots();
             obj.View.clearResponseFft();
             obj.View.clearFrf();
@@ -73,6 +75,8 @@ classdef AppController < handle
             if nRuns >= 2
                 obj.View.setAverageRunProgress(1, nRuns);
             end
+            obj.View.showLiveResponseScope(1 / obj.Model.T);
+            obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope());
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
             % cannot stay greyed out after an interrupt.
@@ -126,10 +130,11 @@ classdef AppController < handle
                             drawnow;
                         end
 
-                        obj.Model.startSimulation();
-                        if k == 1
-                            obj.View.updateResponsePlot([], []);
+                        if k > 1
+                            obj.View.showLiveResponseScope(1 / obj.Model.T);
                         end
+                        obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope());
+                        obj.Model.startSimulation();
 
                         tRun = tic;
                         runLimit = obj.Model.S + timeout_s;
@@ -137,11 +142,8 @@ classdef AppController < handle
                         while ~obj.StopRequested ...
                                 && obj.Model.isSimulationRunning() ...
                                 && toc(tRun) < runLimit
-                            obj.plotLiveResponse();
-                            % pause already flushes graphics. Extra drawnow here
-                            % plus yyaxis/xlim on uiaxes causes SceneTree
-                            % replaceChild warnings.
                             pause(0.1);
+                            drawnow;
                         end
 
                         if obj.StopRequested || obj.Model.isSimulationRunning()
@@ -149,7 +151,8 @@ classdef AppController < handle
                         end
 
                         obj.waitUntilStopped(5);
-                        pause(0.2);
+                        obj.Model.loadKernelLoggedSignals();
+                        obj.View.restoreResponseAxes();
                         acc = obj.accumulateRun(acc);
                         obj.plotAccumulated(acc);
 
@@ -181,10 +184,14 @@ classdef AppController < handle
         function handleStopSimCallback(obj)
             obj.StopRequested = true;
             try
-                obj.Model.stopSimulation();
+                if obj.RunInProgress
+                    obj.Model.haltKernel();
+                else
+                    obj.Model.stopSimulation();
+                    obj.restoreIdleUi();
+                end
             catch
             end
-            obj.restoreIdleUi();
         end
 
         function handleSignalBuilderCallback(obj)
@@ -255,6 +262,10 @@ classdef AppController < handle
     methods (Access = private)
         function finishRun(obj)
             try
+                obj.View.restoreResponseAxes();
+            catch
+            end
+            try
                 obj.Model.stopSimulation();
             catch
             end
@@ -278,33 +289,25 @@ classdef AppController < handle
                 || contains(ME.message, 'Operation terminated', 'IgnoreCase', true);
         end
 
-        function plotLiveResponse(obj)
-            [t, y] = obj.Model.getLiveCart1Position();
-            tab = obj.View.selectedTabTitle();
-            if tab == "Controls - Time"
-                [tRef, yRef] = obj.Model.getLoggedForcing();
-                [tErr, yErr] = obj.Model.getLiveError();
-                [tEff, yEff] = obj.Model.getLiveControlEffort();
-                obj.View.updateLiveControlsPlots(t, y, tRef, yRef, tErr, yErr, tEff, yEff);
-            else
-                obj.View.updateLivePlots(t, y);
-            end
-        end
-
         function plotLoggedResponse(obj)
-            [t, y] = obj.Model.getLiveCart1Position();
+            [t, y] = obj.Model.getKernelLoggedResponse();
             if ~isempty(t) && ~isempty(y)
+                obj.View.setResponseStatus("");
                 obj.View.updateResponsePlot(t, y);
+            else
+                obj.View.updateResponsePlot([], []);
+                obj.View.setResponseStatus( ...
+                    "No kernel log (~S/T samples). Last ExtMode dump ignored.");
             end
             [tRef, yRef] = obj.Model.getLoggedForcing();
             if ~isempty(tRef) && ~isempty(yRef)
                 obj.View.updateControlsReferenceInput(tRef, yRef);
             end
-            [tErr, yErr] = obj.Model.getLiveError();
+            [tErr, yErr] = obj.Model.getKernelLoggedError();
             if ~isempty(tErr) && ~isempty(yErr)
                 obj.View.updateControlsError(tErr, yErr);
             end
-            [tEff, yEff] = obj.Model.getLiveControlEffort();
+            [tEff, yEff] = obj.Model.getKernelLoggedControlEffort();
             if ~isempty(tEff) && ~isempty(yEff)
                 obj.View.updateControlsEffort(tEff, yEff);
             end
@@ -372,19 +375,19 @@ classdef AppController < handle
         end
 
         function acc = accumulateRun(obj, acc)
-            [tY, y] = obj.Model.getLoggedResponse();
+            [tY, y] = obj.Model.getKernelLoggedResponse();
             if ~isempty(tY) && ~isempty(y)
                 acc.tResp{end+1} = tY(:);
                 acc.yResp{end+1} = y(:);
             end
 
-            [tErr, yErr] = obj.Model.getLiveError();
+            [tErr, yErr] = obj.Model.getKernelLoggedError();
             if ~isempty(tErr) && ~isempty(yErr)
                 acc.tErr{end+1} = tErr(:);
                 acc.yErr{end+1} = yErr(:);
             end
 
-            [tEff, yEff] = obj.Model.getLiveControlEffort();
+            [tEff, yEff] = obj.Model.getKernelLoggedControlEffort();
             if ~isempty(tEff) && ~isempty(yEff)
                 acc.tEff{end+1} = tEff(:);
                 acc.yEff{end+1} = yEff(:);
@@ -432,6 +435,12 @@ classdef AppController < handle
                 end
             end
             obj.View.updateFrf(frf, nFrf >= 2);
+            if isempty(tY)
+                obj.View.setResponseStatus( ...
+                    "No kernel log (~S/T samples). Last ExtMode dump ignored.");
+            else
+                obj.View.setResponseStatus("");
+            end
 
             obj.Model.LastAverage = struct( ...
                 "n", acc.n, ...
