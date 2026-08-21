@@ -130,10 +130,13 @@ classdef AppController < handle
                             drawnow;
                         end
 
-                        if k > 1
-                            obj.View.showLiveResponseScope(1 / obj.Model.T);
+                        % Bind once after connect. Recreating uitimescope /
+                        % simulation() on run 2+ leaves the live view empty
+                        % because SLDRT does not reattach LoggedSignals.
+                        if k == 1
+                            obj.Model.connectLiveTimeScope( ...
+                                obj.View.getResponseTimeScope());
                         end
-                        obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope());
                         obj.Model.startSimulation();
 
                         tRun = tic;
@@ -152,7 +155,6 @@ classdef AppController < handle
 
                         obj.waitUntilStopped(5);
                         obj.Model.loadKernelLoggedSignals();
-                        obj.View.restoreResponseAxes();
                         acc = obj.accumulateRun(acc);
                         obj.plotAccumulated(acc);
 
@@ -165,6 +167,8 @@ classdef AppController < handle
                             obj.pauseInterruptible(1.0);
                         end
                     end
+                    obj.View.restoreResponseAxes();
+                    obj.plotAccumulated(acc);
                 end
 
             catch ME
