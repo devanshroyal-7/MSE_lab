@@ -10,6 +10,10 @@ classdef SineSignal < BaseSignal
 
     %}
 
+    properties (Constant)
+        DisplayFreqBuffer = 5   % [Hz] headroom past the tone on FFT / FRF axes
+    end
+
     properties
         Name = "Sine"
         Duration    % [s]
@@ -45,7 +49,9 @@ classdef SineSignal < BaseSignal
             f = obj.Frequency;
             if ~(isfinite(f) && f > 0)
                 f = NaN;
+                return;
             end
+            f = f + SineSignal.DisplayFreqBuffer;
         end
 
         function y = evaluate(obj, t)
