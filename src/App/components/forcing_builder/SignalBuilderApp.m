@@ -42,11 +42,16 @@ function tsData = SignalBuilderApp(opts)
         [t, y] = model.compileFinalSignal();
 
         tsData = timeseries(y, t);
+        fEx = model.excitationFreqHz();
+        if ~(isfinite(fEx) && fEx > 0)
+            fEx = FftAnalyzer.DisplayFreqMax;
+        end
         tsData.UserData = struct( ...
             "CycleDuration", model.CycleDuration, ...
             "NumCycles", model.NumCycles, ...
             "Quantity", char(quantity.Mode), ...
-            "Unit", char(quantity.Unit));
+            "Unit", char(quantity.Unit), ...
+            "ExcitationFreqHz", fEx);
     end
 
     delete(controller)

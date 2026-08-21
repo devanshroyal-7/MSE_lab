@@ -152,6 +152,22 @@ classdef SignalBuilderModel < handle
             tf = ~isempty(y) && any(abs(y) > obj.AmplitudeLimit);
         end
 
+        function f = excitationFreqHz(obj)
+            % Max commanded frequency among stacked signals [Hz].
+            % NaN when none of the signals has a well-defined band.
+            f = NaN;
+            for i = 1:numel(obj.Signals)
+                fi = obj.Signals{i}.excitationFrequencyHz();
+                if isfinite(fi) && fi > 0
+                    if ~isfinite(f)
+                        f = fi;
+                    else
+                        f = max(f, fi);
+                    end
+                end
+            end
+        end
+
         function resetModel(obj)
             obj.Signals = {};
             obj.Offset = 0;

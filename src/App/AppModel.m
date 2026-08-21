@@ -180,6 +180,25 @@ classdef AppModel < handle
             end
         end
 
+        function f = displayFreqMax(obj)
+            % FFT / FRF x-axis cap from the selected forcing function.
+            % Sine / sweep / noise use their commanded frequency; otherwise 20 Hz.
+            f = FftAnalyzer.DisplayFreqMax;
+            ts = obj.ForcingSignal;
+            if isempty(ts) || ~isa(ts, 'timeseries')
+                return;
+            end
+            try
+                ud = ts.UserData;
+            catch
+                return;
+            end
+            if isstruct(ud) && isfield(ud, 'ExcitationFreqHz') ...
+                    && isfinite(ud.ExcitationFreqHz) && ud.ExcitationFreqHz > 0
+                f = ud.ExcitationFreqHz;
+            end
+        end
+
         function prepareExternalMode(obj)
             % External-mode flags needed to connect/start. Do not shrink
             % ExtMode Duration for live uiaxes stitching — live view is

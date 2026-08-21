@@ -46,6 +46,13 @@ classdef NoiseSignal < BaseSignal
             td = obj.Duration;
         end
 
+        function f = excitationFrequencyHz(obj)
+            f = obj.UpperFrequency;
+            if ~(isfinite(f) && f > 0)
+                f = NaN;
+            end
+        end
+
         function y = evaluate(obj, t)
             y = zeros(size(t));
 

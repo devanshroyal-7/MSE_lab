@@ -27,4 +27,12 @@ classdef (Abstract) BaseSignal < handle
     methods (Abstract)
         y = evaluate(obj, t)
     end
+
+    methods
+        function f = excitationFrequencyHz(~)
+            % Highest commanded frequency [Hz], or NaN when the waveform
+            % has no well-defined excitation band (step, ramp, custom, …).
+            f = NaN;
+        end
+    end
 end

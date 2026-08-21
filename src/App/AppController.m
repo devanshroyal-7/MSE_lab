@@ -214,6 +214,7 @@ classdef AppController < handle
                 stopTime = sim_input.Time(end);
 
                 obj.View.updateReferencePlot(sim_input)
+                obj.View.setFreqDisplayMax(obj.Model.displayFreqMax());
                 obj.plotForcingFft(sim_input)
 
                 fprintf('Signal successfully set (%s). Duration %.2f seconds.\n', ...
@@ -238,6 +239,7 @@ classdef AppController < handle
             obj.View.clearResponseFft();
             obj.View.clearFrf();
             obj.View.clearControlsBode();
+            obj.View.setFreqDisplayMax(FftAnalyzer.DisplayFreqMax);
         end
 
         function handleSimParamsChangedCallback(obj, k, b, enabled)
@@ -421,6 +423,7 @@ classdef AppController < handle
         end
 
         function plotAccumulated(obj, acc)
+            obj.View.setFreqDisplayMax(obj.Model.displayFreqMax());
             [t1, y1] = AppController.meanSignals(acc.tResp1, acc.yResp1);
             obj.View.updateResponsePlot(t1, y1, 1);
 

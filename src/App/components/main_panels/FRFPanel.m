@@ -26,6 +26,7 @@ classdef FRFPanel < handle
         CoherenceLine2
         ShowCart1 (1,1) logical = true
         ShowCart2 (1,1) logical = false
+        XLim (1,2) double = [0, 20]
     end
     methods
         function obj = FRFPanel(parentContainer)
@@ -118,11 +119,7 @@ classdef FRFPanel < handle
                 set(cohLine, 'XData', NaN, 'YData', NaN);
             end
 
-            if isfield(result, 'xLim') && numel(result.xLim) == 2 && result.xLim(2) > result.xLim(1)
-                xLim = result.xLim;
-            else
-                xLim = FftAnalyzer.displayXLim();
-            end
+            xLim = obj.XLim;
             xlim(obj.AxMag, xLim);
             xlim(obj.AxPhase, xLim);
             xlim(obj.AxCoherence, xLim);
@@ -142,6 +139,16 @@ classdef FRFPanel < handle
             obj.applyMagYLim();
         end
 
+        function setXLim(obj, xLim)
+            if nargin < 2 || numel(xLim) ~= 2 || ~(xLim(2) > xLim(1))
+                xLim = FftAnalyzer.displayXLim();
+            end
+            obj.XLim = xLim;
+            xlim(obj.AxMag, xLim);
+            xlim(obj.AxPhase, xLim);
+            xlim(obj.AxCoherence, xLim);
+        end
+
         function clearPlots(obj)
             set(obj.MagLine, 'XData', NaN, 'YData', NaN);
             set(obj.PhaseLine, 'XData', NaN, 'YData', NaN);
@@ -149,7 +156,7 @@ classdef FRFPanel < handle
             set(obj.MagLine2, 'XData', NaN, 'YData', NaN);
             set(obj.PhaseLine2, 'XData', NaN, 'YData', NaN);
             set(obj.CoherenceLine2, 'XData', NaN, 'YData', NaN);
-            xLim = FftAnalyzer.displayXLim();
+            xLim = obj.XLim;
             xlim(obj.AxMag, xLim);
             xlim(obj.AxPhase, xLim);
             xlim(obj.AxCoherence, xLim);

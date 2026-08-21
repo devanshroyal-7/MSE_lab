@@ -108,6 +108,7 @@ classdef AppView < handle
             obj.TabGroup.SelectionChangedFcn = @(src, event) obj.handleTabChanged();
             obj.handleTabChanged();
             obj.setPlotCarts(obj.Sidebar.plotCart1(), obj.Sidebar.plotCart2());
+            obj.setFreqDisplayMax(FftAnalyzer.DisplayFreqMax);
         end
     
         function updateReferencePlot(obj, sim_input)
@@ -163,6 +164,13 @@ classdef AppView < handle
             obj.FRFPanel.setCartVisible(showCart1, showCart2);
             obj.ControlsPanel.setCartVisible(showCart1, showCart2);
             obj.ControlsFrequencyPanel.setCartVisible(showCart1, showCart2);
+        end
+
+        function setFreqDisplayMax(obj, fMax)
+            xLim = FftAnalyzer.displayXLim(fMax);
+            obj.FFTPanel.setXLim(xLim);
+            obj.FRFPanel.setXLim(xLim);
+            obj.ControlsFrequencyPanel.setXLim(xLim);
         end
 
         function n = runsToAverage(obj)

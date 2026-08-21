@@ -132,8 +132,11 @@ classdef FftAnalyzer
                 "n", 0);
         end
 
-        function xLim = displayXLim()
-            xLim = [0, FftAnalyzer.DisplayFreqMax];
+        function xLim = displayXLim(freqMax)
+            if nargin < 1 || isempty(freqMax) || ~(isfinite(freqMax) && freqMax > 0)
+                freqMax = FftAnalyzer.DisplayFreqMax;
+            end
+            xLim = [0, freqMax];
         end
 
         function H = fromInputOutput(tU, u, tY, y)

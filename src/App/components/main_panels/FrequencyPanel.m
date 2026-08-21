@@ -30,6 +30,7 @@ classdef FrequencyPanel < handle
         ResponsePhaseLine2
         ShowCart1 (1,1) logical = true
         ShowCart2 (1,1) logical = false
+        XLim (1,2) double = [0, 20]
     end
     methods
         function obj = FrequencyPanel(parentContainer)
@@ -102,6 +103,17 @@ classdef FrequencyPanel < handle
             obj.applyCartVisibility();
         end
 
+        function setXLim(obj, xLim)
+            if nargin < 2 || numel(xLim) ~= 2 || ~(xLim(2) > xLim(1))
+                xLim = FftAnalyzer.displayXLim();
+            end
+            obj.XLim = xLim;
+            obj.AxForcingMag.XLim = xLim;
+            obj.AxForcingPhase.XLim = xLim;
+            obj.AxResponseMag.XLim = xLim;
+            obj.AxResponsePhase.XLim = xLim;
+        end
+
         function clearPlots(obj)
             empty = FftAnalyzer.emptySpectrum();
             obj.updateForcing(empty);
@@ -120,8 +132,8 @@ classdef FrequencyPanel < handle
             ax.XLim = FftAnalyzer.displayXLim();
         end
 
-        function setSpectrumLines(~, magAx, magLine, phaseAx, phaseLine, spec)
-            xLim = FftAnalyzer.displayXLim();
+        function setSpectrumLines(obj, magAx, magLine, phaseAx, phaseLine, spec)
+            xLim = obj.XLim;
             if nargin < 6 || isempty(spec) || spec.n == 0 || isempty(spec.freq)
                 set(magLine, 'XData', NaN, 'YData', NaN);
                 set(phaseLine, 'XData', NaN, 'YData', NaN);
