@@ -9,11 +9,18 @@ classdef AppModel < handle
     % This plant is Simulink Desktop Real-Time (sldrt.tlc), not Speedgoat
     % slrealtime — there is no slrealtime.fileLogImport.
     %
-    % Plant log contract:
-    %   Block  MSE_PLANT/EMB - Spring-Mass-Damper System 2DOF - DAQ2(NI PCIe-6321)1
-    %   Port 3 Cart1-Position [m]  (already instrumented in the .slx)
-    %   Clock  MSE_PLANT/Clock1 → To Workspace rt_time
-    %   To Workspace names: rt_time, cart1_position [m], … (ExtMode-duration dumps only)
+    % Plant log contract (SDI streaming, then post-run workspace columns):
+    %   EMB ... DAQ2(NI PCIe-6321)1
+    %     port 1 Motor Current [A]     → motor_current
+    %     port 2 Motor Velocity [RPM]  → motor_velocity
+    %     port 3 Cart1-Position [m]    → cart1_position (uitimescope bind)
+    %     port 4 Car2-Position [m]     → cart2_position
+    %     port 6 Cart1-Velocity [m/s]  → cart1_velocity
+    %     port 7 Cart2-Velocity [m/s]  → cart2_velocity
+    %   Clock1:1                       → rt_time
+    %   Limit Input:1                  → f_input
+    %   Sum (r-y):1                    → error
+    %   PID Controller:1               → control_effort
     %
     %{
     Example usage:
@@ -174,12 +181,17 @@ classdef AppModel < handle
         function prepareExternalMode(obj)
             % External-mode flags needed to connect/start. Do not shrink
             % ExtMode Duration for live uiaxes stitching — live view is
-            % uitimescope, post-run data is the kernel File Log / SDI.
+            % uitimescope, post-run data is SDI of instrumented signals.
             modelName = char(obj.SimulationModelName);
             if ~bdIsLoaded(modelName)
                 load_system(modelName);
             end
             set_param(modelName, 'ExtModeArmWhenConnect', 'on');
+            try
+                set_param(modelName, 'SignalLogging', 'on');
+            catch
+            end
+            obj.markKernelSignalsForStreaming();
         end
 
         function [t, y] = getLoggedForcing(obj)
@@ -267,10 +279,7 @@ classdef AppModel < handle
             [blk, port] = obj.cart1PositionBlock();
             sigPath = sprintf('%s:%d', blk, port);
 
-            try
-                Simulink.sdi.markSignalForStreaming(blk, port, 'on');
-            catch
-            end
+            obj.markKernelSignalsForStreaming();
             try
                 set_param(modelName, 'SignalLogging', 'on');
             catch
@@ -363,7 +372,7 @@ classdef AppModel < handle
             y = [];
             while toc(t0) < 8
                 obj.tryImportSldrtArchive();
-                [t, y] = obj.readKernelNamed('cart1_position', 'Cart1-Position');
+                [t, y] = obj.readKernelNamed('cart1_position', obj.sdiAliases('cart1_position'));
                 if obj.isCompleteSeries(t, y)
                     break;
                 end
@@ -381,26 +390,31 @@ classdef AppModel < handle
                 obj.EffortTimeBuffer = [];
                 obj.EffortBuffer = [];
                 obj.initAuxLogs();
+                obj.clearLoggedWorkspace();
                 obj.KernelLogsLoaded = true;
                 return;
             end
 
-            obj.TimeBuffer = t(:)';
+            tClock = t(:);
+            obj.TimeBuffer = tClock';
             obj.PositionBuffer = y(:)';
 
-            [tF, yF] = obj.readKernelNamed('f_input', 'f_input');
-            obj.ForcingTimeBuffer = tF(:)';
+            [tF, yF] = obj.readKernelNamed('f_input', obj.sdiAliases('f_input'));
+            yF = obj.ontoClock(tF, yF, tClock);
+            obj.ForcingTimeBuffer = tClock';
             obj.ForcingBuffer = yF(:)';
 
-            [tE, yE] = obj.readKernelNamed('error', 'error');
-            obj.ErrorTimeBuffer = tE(:)';
+            [tE, yE] = obj.readKernelNamed('error', obj.sdiAliases('error'));
+            yE = obj.ontoClock(tE, yE, tClock);
+            obj.ErrorTimeBuffer = tClock';
             obj.ErrorBuffer = yE(:)';
 
-            [tU, yU] = obj.readKernelNamed('control_effort', 'control_effort');
-            obj.EffortTimeBuffer = tU(:)';
+            [tU, yU] = obj.readKernelNamed('control_effort', obj.sdiAliases('control_effort'));
+            yU = obj.ontoClock(tU, yU, tClock);
+            obj.EffortTimeBuffer = tClock';
             obj.EffortBuffer = yU(:)';
 
-            obj.loadAuxLogs();
+            obj.loadAuxLogs(tClock);
             obj.promoteLoggedSignalsToWorkspace();
             obj.KernelLogsLoaded = true;
         end
@@ -500,6 +514,10 @@ classdef AppModel < handle
         function [blk, port] = cart1PositionBlock(obj)
             % EMB subsystem output 3 is Cart1-Position [m].
             port = 3;
+            blk = obj.embBlockPath();
+        end
+
+        function blk = embBlockPath(obj)
             modelName = char(obj.SimulationModelName);
             fallback = [modelName ...
                 '/EMB - Spring-Mass-Damper System 2DOF - DAQ2(NI PCIe-6321)1'];
@@ -515,6 +533,64 @@ classdef AppModel < handle
                 end
                 blk = char(hits);
             catch
+            end
+        end
+
+        function markKernelSignalsForStreaming(obj)
+            % Same API that made cart1 complete: SDI streaming on the
+            % instrumented port. Live uitimescope still binds only port 3.
+            specs = obj.kernelSignalSpecs();
+            for i = 1:numel(specs)
+                s = specs(i);
+                if isempty(s.block) || s.port < 1
+                    continue;
+                end
+                try
+                    Simulink.sdi.markSignalForStreaming(s.block, s.port, 'on');
+                catch
+                end
+            end
+        end
+
+        function specs = kernelSignalSpecs(obj)
+            modelName = char(obj.SimulationModelName);
+            emb = obj.embBlockPath();
+            specs = [ ...
+                obj.signalSpec('cart1_position', emb, 3, ...
+                    {'Cart1-Position', 'Cart1-Position [m]'}) ...
+                obj.signalSpec('cart2_position', emb, 4, ...
+                    {'Car2-Position', 'Cart2-Position', 'Car2-Position [m]'}) ...
+                obj.signalSpec('cart1_velocity', emb, 6, ...
+                    {'Cart1-Velocity', 'Cart1-Velocity [m/s]'}) ...
+                obj.signalSpec('cart2_velocity', emb, 7, ...
+                    {'Cart2-Velocity', 'Cart2-Velocity [m/s]'}) ...
+                obj.signalSpec('motor_current', emb, 1, ...
+                    {'Motor Current', 'Motor Current [A]', 'motor_current'}) ...
+                obj.signalSpec('motor_velocity', emb, 2, ...
+                    {'Motor Velocity', 'Motor Velocity [RPM]', 'motor_velocity'}) ...
+                obj.signalSpec('rt_time', [modelName '/Clock1'], 1, ...
+                    {'rt_time', 'Clock', 'Clock1'}) ...
+                obj.signalSpec('f_input', [modelName '/Limit Input'], 1, ...
+                    {'f_input', 'Input Force', 'Limit Input'}) ...
+                obj.signalSpec('error', [modelName '/Sum'], 1, ...
+                    {'error', 'r-y'}) ...
+                obj.signalSpec('control_effort', [modelName '/PID Controller'], 1, ...
+                    {'control_effort', 'PID Controller'}) ...
+                ];
+        end
+
+        function spec = signalSpec(~, ws, block, port, sdi)
+            spec = struct('ws', ws, 'block', block, 'port', port, 'sdi', {sdi});
+        end
+
+        function names = sdiAliases(obj, wsName)
+            names = {wsName};
+            specs = obj.kernelSignalSpecs();
+            for i = 1:numel(specs)
+                if strcmp(specs(i).ws, wsName)
+                    names = specs(i).sdi;
+                    return;
+                end
             end
         end
 
@@ -555,7 +631,12 @@ classdef AppModel < handle
             end
         end
 
-        function [t, y] = readKernelNamed(obj, wsName, sdiName)
+        function [t, y] = readKernelNamed(obj, wsName, sdiNames)
+            if nargin < 3 || isempty(sdiNames)
+                sdiNames = {wsName};
+            elseif ~iscell(sdiNames)
+                sdiNames = {sdiNames};
+            end
             candidates = {};
             [t, y] = obj.readLogsoutNamed(wsName);
             if ~isempty(y)
@@ -565,17 +646,17 @@ classdef AppModel < handle
             if ~isempty(y)
                 candidates{end+1} = {t(:), y(:)};
             end
-            [t, y] = obj.readSdiNamed(sdiName);
-            if ~isempty(y)
-                candidates{end+1} = {t(:), y(:)};
-            end
-            if ~strcmp(wsName, sdiName)
-                [t, y] = obj.readSdiNamed(wsName);
+            for i = 1:numel(sdiNames)
+                [t, y] = obj.readSdiNamed(sdiNames{i});
                 if ~isempty(y)
                     candidates{end+1} = {t(:), y(:)};
                 end
             end
             [t, y] = obj.pickBestSeries(candidates);
+            if ~isempty(y)
+                y = y(:);
+                t = t(:);
+            end
         end
 
         function [bestT, bestY] = pickBestSeries(obj, candidates)
@@ -626,23 +707,53 @@ classdef AppModel < handle
         end
 
         function promoteLoggedSignalsToWorkspace(obj)
-            % Labs plot(rt_time, cart1_position) and plot(rt_time, f_input).
-            if ~isempty(obj.TimeBuffer)
-                assignin('base', 'rt_time', obj.TimeBuffer(:));
+            % Replace ExtMode To Workspace leftovers with kernel columns
+            % on the same rt_time. Missing kernel traces become [] not 20×1.
+            obj.clearLoggedWorkspace();
+            tClock = obj.TimeBuffer(:);
+            if isempty(tClock)
+                return;
             end
-            if ~isempty(obj.PositionBuffer)
-                assignin('base', 'cart1_position', obj.PositionBuffer(:));
-            end
-            if ~isempty(obj.ForcingBuffer)
-                assignin('base', 'f_input', obj.ForcingBuffer(:));
-            end
-            if ~isempty(obj.ErrorBuffer)
-                assignin('base', 'error', obj.ErrorBuffer(:));
-            end
-            if ~isempty(obj.EffortBuffer)
-                assignin('base', 'control_effort', obj.EffortBuffer(:));
-            end
+            assignin('base', 'rt_time', tClock);
+            assignin('base', 'cart1_position', obj.colOrEmpty(obj.PositionBuffer));
+            assignin('base', 'f_input', obj.colOrEmpty(obj.ForcingBuffer));
+            assignin('base', 'error', obj.colOrEmpty(obj.ErrorBuffer));
+            assignin('base', 'control_effort', obj.colOrEmpty(obj.EffortBuffer));
             obj.promoteAuxLogs();
+        end
+
+        function y = colOrEmpty(~, y)
+            if isempty(y)
+                y = [];
+                return;
+            end
+            y = y(:);
+        end
+
+        function yOut = ontoClock(obj, t, y, tClock)
+            yOut = [];
+            tClock = tClock(:);
+            if isempty(y) || isempty(t) || numel(tClock) < 2
+                return;
+            end
+            n = min(numel(t), numel(y));
+            t = t(1:n);
+            t = t(:);
+            y = y(1:n);
+            y = y(:);
+            if ~obj.isCompleteSeries(t, y)
+                return;
+            end
+            if numel(y) == numel(tClock) && max(abs(t - tClock)) <= obj.T
+                yOut = y;
+                return;
+            end
+            try
+                yOut = interp1(t, y, tClock, 'linear', 'extrap');
+                yOut = yOut(:);
+            catch
+                yOut = [];
+            end
         end
 
         function promoteAuxLogs(obj)
@@ -650,18 +761,24 @@ classdef AppModel < handle
             for i = 1:numel(names)
                 wsName = names{i};
                 log = obj.AuxLogs.(wsName);
-                if ~isempty(log.y)
-                    assignin('base', wsName, log.y(:));
-                end
+                assignin('base', wsName, obj.colOrEmpty(log.y));
             end
         end
 
-        function loadAuxLogs(obj)
+        function loadAuxLogs(obj, tClock)
+            if nargin < 2
+                tClock = obj.TimeBuffer(:);
+            end
             names = obj.auxLogNames();
             for i = 1:numel(names)
                 wsName = names{i};
-                [t, y] = obj.readKernelNamed(wsName, obj.auxSdiName(wsName));
-                obj.AuxLogs.(wsName) = struct('t', t(:)', 'y', y(:)');
+                [t, y] = obj.readKernelNamed(wsName, obj.sdiAliases(wsName));
+                y = obj.ontoClock(t, y, tClock);
+                if isempty(y)
+                    obj.AuxLogs.(wsName) = struct('t', [], 'y', []);
+                else
+                    obj.AuxLogs.(wsName) = struct('t', tClock(:)', 'y', y(:)');
+                end
             end
         end
 
@@ -678,19 +795,6 @@ classdef AppModel < handle
             names = { ...
                 'cart2_position', 'cart1_velocity', 'cart2_velocity', ...
                 'motor_current', 'motor_velocity'};
-        end
-
-        function sdiName = auxSdiName(~, wsName)
-            switch wsName
-                case 'cart2_position'
-                    sdiName = 'Cart2-Position';
-                case 'cart1_velocity'
-                    sdiName = 'Cart1-Velocity';
-                case 'cart2_velocity'
-                    sdiName = 'Cart2-Velocity';
-                otherwise
-                    sdiName = wsName;
-            end
         end
 
         function [t, y] = readWorkspaceNamed(obj, varName)

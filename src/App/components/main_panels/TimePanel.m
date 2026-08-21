@@ -96,7 +96,8 @@ classdef TimePanel < handle
             hold(obj.ResponsePlot, 'on');
             obj.OverlaySameAxisHandle = plot(obj.ResponsePlot, NaN, NaN, 'b--', LineWidth=1.2);
             obj.OverlaySameAxisHandle.Visible = 'off';
-            obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, 'r-', LineWidth=1.5);
+            obj.RespLineHandle = plot(obj.ResponsePlot, NaN, NaN, '-', ...
+                'Color', [0.85 0.15 0.15], LineWidth=1.5);
             xlabel(obj.ResponsePlot, 'Time (s)');
             obj.ResponsePlot.YAxis(1).Label.String = 'Displacement (mm)';
             obj.ResponsePlot.YAxis(1).Color = [0 0 0];
@@ -208,6 +209,7 @@ classdef TimePanel < handle
                 scope.BufferLength = nBuf;
             catch
             end
+            obj.applyTimeScopeLineColor(scope);
             obj.ResponseTimeScope = scope;
         end
 
@@ -335,6 +337,31 @@ classdef TimePanel < handle
                 if isvalid(scope)
                     delete(scope);
                 end
+            catch
+            end
+        end
+
+        function applyTimeScopeLineColor(~, scope)
+            % Default uitimescope channel color is yellow. Match the
+            % post-run Response line ([0.85 0.15 0.15]).
+            rgb = [0.85 0.15 0.15];
+            names = {'LineColor', 'PlotColor', 'ChannelColor', 'SignalColor'};
+            for i = 1:numel(names)
+                try
+                    scope.(names{i}) = rgb;
+                catch
+                end
+            end
+            try
+                scope.ColorOrder = rgb;
+            catch
+                try
+                    scope.ColorOrder = [rgb; 0 0.45 0.74];
+                catch
+                end
+            end
+            try
+                scope.Style.LineColor = rgb;
             catch
             end
         end
