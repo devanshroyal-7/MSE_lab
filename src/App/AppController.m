@@ -25,7 +25,6 @@ classdef AppController < handle
     properties (Access = private)
         StopRequested (1,1) logical = false
         RunInProgress (1,1) logical = false
-        PumpTimer
     end
 
     methods 
@@ -63,6 +62,7 @@ classdef AppController < handle
             obj.View.clearResponseFft();
             obj.View.clearFrf();
             obj.View.clearControlsBode();
+            obj.View.showLiveResponseScope(1 / obj.Model.T);
 
             % Ctrl+C in the Command Window still runs this, so Start/Save
             % cannot stay greyed out after an interrupt.
@@ -105,30 +105,25 @@ classdef AppController < handle
                 if strcmp(obj.Model.getSimulationStatus(), 'stopped')
                     errordlg("Model failed to enter real-time execution", "Target Error");
                 else
+                    obj.Model.connectLiveTimeScope(obj.View.getResponseTimeScope());
                     obj.Model.startSimulation();
-                    obj.View.updateResponsePlot([], []);
 
                     tRun = tic;
                     runLimit = obj.Model.S + timeout_s;
-                    obj.startPumpTimer();
-                    pumpCleanup = onCleanup(@() obj.stopPumpTimer()); %#ok<NASGU>
 
                     while ~obj.StopRequested ...
                             && obj.Model.isSimulationRunning() ...
                             && toc(tRun) < runLimit
-                        % Capture runs on a 10 ms timer so uiaxes updates
-                        % cannot skip ExtMode packets. Plot is display-only.
                         pause(0.1);
-                        obj.plotLiveResponse();
+                        drawnow;
                     end
-
-                    obj.stopPumpTimer();
 
                     if obj.StopRequested || obj.Model.isSimulationRunning()
                         obj.Model.haltKernel();
                     end
 
-                    obj.Model.finalizeLoggedSignals();
+                    obj.Model.loadKernelLoggedSignals();
+                    obj.View.restoreResponseAxes();
                     obj.plotLoggedResponse();
                     obj.plotResponseFft();
                     obj.plotFrf();
@@ -229,7 +224,10 @@ classdef AppController < handle
 
     methods (Access = private)
         function finishRun(obj)
-            obj.stopPumpTimer();
+            try
+                obj.View.restoreResponseAxes();
+            catch
+            end
             try
                 obj.Model.stopSimulation();
             catch
@@ -247,63 +245,14 @@ classdef AppController < handle
             tf = ~isempty(d) && isvalid(d) && d.CancelRequested;
         end
 
-        function startPumpTimer(obj)
-            obj.stopPumpTimer();
-            tmr = timer( ...
-                'Name', 'MSELivePump', ...
-                'ExecutionMode', 'fixedRate', ...
-                'Period', 0.01, ...
-                'BusyMode', 'drop', ...
-                'TimerFcn', @(~, ~) obj.pumpFromTimer());
-            obj.PumpTimer = tmr;
-            start(tmr);
-        end
-
-        function pumpFromTimer(obj)
-            try
-                if ~obj.StopRequested
-                    obj.Model.pumpLiveBuffers();
-                end
-            catch
-            end
-        end
-
-        function stopPumpTimer(obj)
-            tmr = obj.PumpTimer;
-            obj.PumpTimer = [];
-            if isempty(tmr)
-                return;
-            end
-            try
-                if isvalid(tmr)
-                    stop(tmr);
-                    delete(tmr);
-                end
-            catch
-            end
-        end
-
         function tf = isInterrupt(~, ME)
             tf = any(strcmp(ME.identifier, ...
                 {'MATLAB:interrupt', 'MATLAB:OperationTerminated'})) ...
                 || contains(ME.message, 'Operation terminated', 'IgnoreCase', true);
         end
 
-        function plotLiveResponse(obj)
-            [t, y] = obj.Model.peekLiveCart1Position();
-            tab = obj.View.selectedTabTitle();
-            if tab == "Controls - Time"
-                [tRef, yRef] = obj.Model.getLoggedForcing();
-                [tErr, yErr] = obj.Model.peekLiveError();
-                [tEff, yEff] = obj.Model.peekLiveControlEffort();
-                obj.View.updateLiveControlsPlots(t, y, tRef, yRef, tErr, yErr, tEff, yEff);
-            else
-                obj.View.updateLivePlots(t, y);
-            end
-        end
-
         function plotLoggedResponse(obj)
-            [t, y] = obj.Model.peekLiveCart1Position();
+            [t, y] = obj.Model.getKernelLoggedResponse();
             if ~isempty(t) && ~isempty(y)
                 obj.View.updateResponsePlot(t, y);
             end
@@ -311,11 +260,11 @@ classdef AppController < handle
             if ~isempty(tRef) && ~isempty(yRef)
                 obj.View.updateControlsReferenceInput(tRef, yRef);
             end
-            [tErr, yErr] = obj.Model.getLiveError();
+            [tErr, yErr] = obj.Model.getKernelLoggedError();
             if ~isempty(tErr) && ~isempty(yErr)
                 obj.View.updateControlsError(tErr, yErr);
             end
-            [tEff, yEff] = obj.Model.getLiveControlEffort();
+            [tEff, yEff] = obj.Model.getKernelLoggedControlEffort();
             if ~isempty(tEff) && ~isempty(yEff)
                 obj.View.updateControlsEffort(tEff, yEff);
             end

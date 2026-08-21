@@ -2,6 +2,23 @@ classdef AppModel < handle
     % Application model: loads MSE_PLANT and feeds forcing / sim parameters
     % into the MATLAB base workspace so Desktop Real-Time can read them.
     %
+    % Live Time-tab display is a uitimescope (wired by the plant owner).
+    % After Stop, getKernelLoggedResponse() loads the full kernel-side log
+    % once — File Log, then SDI, then logsout, then base-workspace variables.
+    % It does not stitch ExtMode Duration chunks.
+    %
+    % Plant log contract (base workspace / File Log / SDI / logsout):
+    %   rt_time            [s]   plant clock, length ~S/T
+    %   cart1_position     [m]   cart 1 displacement (app plots mm)
+    %   cart2_position     [m]
+    %   cart1_velocity     [m/s]
+    %   cart2_velocity     [m/s]
+    %   f_input            [N]   commanded/applied force at the plant
+    %   error              [m]   tracking error (closed loop)
+    %   control_effort     [N]
+    %   motor_current, motor_velocity
+    % SDI aliases: Cart1-Position, Cart2-Position, Cart1-Velocity, Cart2-Velocity.
+    %
     %{
     Example usage:
 
@@ -14,7 +31,7 @@ classdef AppModel < handle
 
     % Public properties that correspond to the Simulink model
     properties (Access = public, Transient)
-        Simulation 
+        Simulation
         T (1,1) double {mustBeFloat} = 0.001;
 
     end
@@ -23,7 +40,7 @@ classdef AppModel < handle
         % Hardware parameters
         r           (1,1) double = 0.01;  % pinion gear radius [m]
         Kt          (1,1) double = 0.028; % torque constant [Nm/A]
-        motor_eff   (1,1) double = 1.0;   % system efficiency       
+        motor_eff   (1,1) double = 1.0;   % system efficiency
     end
 
     properties (Access = public)
@@ -41,7 +58,7 @@ classdef AppModel < handle
         % Simulation control and configuration
         SimulationModelName (1,1) string = "MSE_PLANT";
         RunTimeout (1,1) double = 30;   % [s] connect/start hang cap (not run length)
-        
+
         S   (1,1) double {mustBeNumeric} = 10;  % simulation time   [s]
         TimeBuffer      (1,:) double = [];
         PositionBuffer  (1,:) double = [];
@@ -53,30 +70,18 @@ classdef AppModel < handle
         EffortTimeBuffer  (1,:) double = [];
         EffortBuffer      (1,:) double = [];
         ForcingSignal           % timeseries object from SignalBuilder
-
-        % External-mode upload buffer (samples). At T=0.001 this is 0.05 s.
-        LiveBufferSamples (1,1) double = 50;
     end
 
     properties (Access = private)
-        LiveArmed (1,1) logical = false
-        LiveArmedForcing (1,1) logical = false
-        LiveArmedError (1,1) logical = false
-        LiveArmedEffort (1,1) logical = false
-        LiveAcceptLate (1,1) logical = false
-        LiveCaptureEnabled (1,1) logical = false
-        StaleSdiRunId = []
         StaleSdiRunIds = []
-        StaleSdiFingerprint = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN)
-        StaleLogFingerprint = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN)
-        SdiFreshForThisRun (1,1) logical = false
         AuxLogs = struct()
+        KernelLogsLoaded (1,1) logical = false
     end
 
-    events 
+    events
         DataUpdated
     end
-        
+
 
     methods (Access = public)
         function obj = AppModel()
@@ -169,34 +174,15 @@ classdef AppModel < handle
             end
         end
 
-        function prepareLiveStreaming(obj)
-            % SLDRT Run in Kernel uploads Duration-sized buffers. By default
-            % only the last buffer is written to the workspace, which is why
-            % the response plot showed a blip at t=end. Write every buffer
-            % and rearm. These ExtMode settings are part of TARGET_DATA_MAP,
-            % so they must be applied before slbuild (and re-applied after,
-            % because slbuild restores Duration 20480 from the .slx).
+        function prepareExternalMode(obj)
+            % External-mode flags needed to connect/start. Do not shrink
+            % ExtMode Duration for live uiaxes stitching — live view is
+            % uitimescope, post-run data is the kernel File Log / SDI.
             modelName = char(obj.SimulationModelName);
             if ~bdIsLoaded(modelName)
                 load_system(modelName);
             end
-
             set_param(modelName, 'ExtModeArmWhenConnect', 'on');
-            set_param(modelName, 'ExtModeTrigType', 'manual');
-            set_param(modelName, 'ExtModeTrigMode', 'normal');
-            set_param(modelName, 'ExtModeTrigDuration', ...
-                num2str(obj.LiveBufferSamples));
-            set_param(modelName, 'ExtModeLogAll', 'on');
-            set_param(modelName, 'ExtModeWriteAllDataToWs', 'on');
-
-            daqBlk = find_system(modelName, 'SearchDepth', 1, ...
-                'Regexp', 'on', 'Name', '^EMB');
-            if ~isempty(daqBlk)
-                if iscell(daqBlk)
-                    daqBlk = daqBlk{1};
-                end
-                Simulink.sdi.markSignalForStreaming(daqBlk, 3, 'on');
-            end
         end
 
         function [t, y] = getLoggedForcing(obj)
@@ -214,67 +200,34 @@ classdef AppModel < handle
             y = y(1:n);
         end
 
+        function [t, y] = getKernelLoggedResponse(obj)
+            % Full post-run cart-1 trace for TimePanel uiaxes.
+            % t [s], y [mm]. Source is File Log / SDI / logsout / workspace
+            % (rt_time, cart1_position in meters). Not ExtMode 50-sample dumps.
+            obj.ensureKernelLogsLoaded();
+            t = obj.TimeBuffer(:);
+            y = AppModel.metersToMm(obj.PositionBuffer(:));
+        end
+
         function [t, y] = getLoggedResponse(obj)
-            [t, y] = obj.getLiveCart1Position();
-            if ~isempty(y)
-                return;
-            end
-            [t, y] = obj.readWorkspaceNamed('cart1_position');
-            y = AppModel.metersToMm(y);
+            [t, y] = obj.getKernelLoggedResponse();
         end
 
-        function [t, y] = peekLiveCart1Position(obj)
-            t = obj.TimeBuffer(:);
-            y = AppModel.metersToMm(obj.PositionBuffer(:));
-        end
-
-        function [t, y] = peekLiveError(obj)
+        function [t, y] = getKernelLoggedError(obj)
+            obj.ensureKernelLogsLoaded();
             t = obj.ErrorTimeBuffer(:);
             y = AppModel.metersToMm(obj.ErrorBuffer(:));
         end
 
-        function [t, y] = peekLiveControlEffort(obj)
-            t = obj.EffortTimeBuffer(:);
-            y = obj.EffortBuffer(:);
-        end
-
-        function [t, y] = getLiveCart1Position(obj)
-            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
-                obj.captureLiveCart1Chunk();
-            end
-            t = obj.TimeBuffer(:);
-            y = AppModel.metersToMm(obj.PositionBuffer(:));
-        end
-
-        function [t, y] = getLiveFInput(obj)
-            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
-                obj.captureLiveFInputChunk();
-            end
-            t = obj.ForcingTimeBuffer(:);
-            y = obj.ForcingBuffer(:);
-        end
-
-        function [t, y] = getLiveError(obj)
-            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
-                obj.captureLiveNamedChunk('error', 'error', ...
-                    'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
-            end
-            t = obj.ErrorTimeBuffer(:);
-            y = AppModel.metersToMm(obj.ErrorBuffer(:));
-        end
-
-        function [t, y] = getLiveControlEffort(obj)
-            if obj.LiveCaptureEnabled || obj.LiveAcceptLate
-                obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
-                    'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
-            end
+        function [t, y] = getKernelLoggedControlEffort(obj)
+            obj.ensureKernelLogsLoaded();
             t = obj.EffortTimeBuffer(:);
             y = obj.EffortBuffer(:);
         end
 
         function connectTarget(obj)
-            % External mode and ExtMode buffers first, then rebuild so the
-            % host TARGET_DATA_MAP matches the kernel app, then connect.
+            % External mode first, then rebuild so the host TARGET_DATA_MAP
+            % matches the kernel app, then connect.
             modelName = char(obj.SimulationModelName);
             if ~bdIsLoaded(modelName)
                 load_system(modelName);
@@ -284,21 +237,35 @@ classdef AppModel < handle
             obj.applyControlParamsToWorkspace();
             obj.ensureExternalMode();
             obj.stopTargetQuietly();
-            obj.prepareLiveStreaming();
+            obj.prepareExternalMode();
             obj.rebuildTarget(modelName);
-            obj.prepareLiveStreaming();
+            obj.prepareExternalMode();
 
             set_param(modelName, 'SimulationCommand', 'connect');
         end
 
-        function resetLiveLog(obj)
-            % Drop the previous experiment so Start always replaces the
-            % trace. A leftover 0..S series would otherwise re-arm and
-            % ignore (or append past) the new run.
-            if ~isempty(obj.PositionBuffer)
-                obj.StaleLogFingerprint = obj.makeSdiFingerprint( ...
-                    [], obj.TimeBuffer, obj.PositionBuffer);
+        function connectLiveTimeScope(obj, scope) %#ok<INUSD>
+            % Hook for kernel / SDI / File Log live connection.
+            % TimePanel owns the uitimescope; bind the plant signal here.
+            %
+            % Expected logged signal: cart1_position [m] on clock rt_time [s].
+            % Typical R2024a+ Simulink binding (normal sim, not SLDRT-specific):
+            %   simObj = simulation(char(obj.SimulationModelName));
+            %   bind(simObj.LoggedSignals, ...
+            %       obj.SimulationModelName + "/<Cart1 block path>:1", scope);
+            % SLDRT Instrument / File Log streaming is wired by the plant owner.
+            if nargin < 2 || isempty(scope)
+                return;
             end
+            try
+                if ~isvalid(scope)
+                    return;
+                end
+            catch
+            end
+        end
+
+        function resetLoggedSignals(obj)
             obj.TimeBuffer = [];
             obj.PositionBuffer = [];
             obj.VelocityBuffer = [];
@@ -308,27 +275,20 @@ classdef AppModel < handle
             obj.ErrorBuffer = [];
             obj.EffortTimeBuffer = [];
             obj.EffortBuffer = [];
-            obj.LiveArmed = false;
-            obj.LiveArmedForcing = false;
-            obj.LiveArmedError = false;
-            obj.LiveArmedEffort = false;
-            obj.LiveAcceptLate = false;
-            obj.LiveCaptureEnabled = false;
-            obj.SdiFreshForThisRun = false;
+            obj.KernelLogsLoaded = false;
             obj.initAuxLogs();
             obj.clearLoggedWorkspace();
         end
 
         function prepareNewRun(obj)
-            obj.resetLiveLog();
+            obj.resetLoggedSignals();
             obj.snapshotStaleSdi();
         end
 
         function startSimulation(obj)
             obj.applySimParamsToWorkspace();
             obj.applyControlParamsToWorkspace();
-            obj.resetLiveLog();
-            obj.LiveCaptureEnabled = true;
+            obj.resetLoggedSignals();
 
             obj.ensureExternalMode();
             set_param(obj.SimulationModelName, 'SimulationCommand', 'start');
@@ -348,46 +308,41 @@ classdef AppModel < handle
 
         function haltKernel(obj)
             % Stop the current run but keep the external-mode connection
-            % so the last ExtMode / SDI packets can still land.
+            % so File Log / SDI can finish writing the kernel record.
             obj.stopTargetQuietly();
         end
 
-        function pumpLiveBuffers(obj)
-            % Pull the latest ExtMode / SDI packets into the stitched
-            % buffers. Must run at least as often as ExtMode Duration or
-            % workspace-only dumps drop every other packet.
-            if ~obj.LiveCaptureEnabled && ~obj.LiveAcceptLate
-                return;
-            end
-            obj.captureLiveCart1Chunk();
-            obj.captureLiveFInputChunk();
-            obj.captureLiveNamedChunk('error', 'error', ...
-                'ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError');
-            obj.captureLiveNamedChunk('control_effort', 'control_effort', ...
-                'EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort');
-            obj.captureAuxLogs();
-        end
+        function loadKernelLoggedSignals(obj)
+            % One-shot import of the complete kernel log after StopTime.
+            % Preference: File Log import, then SDI, then logsout, then
+            % base-workspace rt_time / cart1_position (meters).
+            pause(0.5);
+            drawnow;
+            obj.tryImportFileLog();
 
-        function dt = livePollPeriod(obj)
-            % ExtMode uploads LiveBufferSamples at a time (0.05 s at T=0.001).
-            % Poll faster than that so the host sees consecutive packets.
-            bufferSec = obj.LiveBufferSamples * obj.T;
-            dt = min(0.04, max(0.015, 0.4 * bufferSec));
-        end
+            [t, y] = obj.readKernelNamed('cart1_position', 'Cart1-Position');
+            obj.TimeBuffer = t(:)';
+            obj.PositionBuffer = y(:)';
 
-        function finalizeLoggedSignals(obj)
-            % Wait out the last upload packets, then prefer the longest
-            % stitched / SDI record over the Duration-sized workspace dump.
-            obj.LiveAcceptLate = true;
-            obj.waitForRemainingPackets();
-            obj.adoptAllRicherLogs();
+            [tF, yF] = obj.readKernelNamed('f_input', 'f_input');
+            obj.ForcingTimeBuffer = tF(:)';
+            obj.ForcingBuffer = yF(:)';
+
+            [tE, yE] = obj.readKernelNamed('error', 'error');
+            obj.ErrorTimeBuffer = tE(:)';
+            obj.ErrorBuffer = yE(:)';
+
+            [tU, yU] = obj.readKernelNamed('control_effort', 'control_effort');
+            obj.EffortTimeBuffer = tU(:)';
+            obj.EffortBuffer = yU(:)';
+
+            obj.loadAuxLogs();
             obj.promoteLoggedSignalsToWorkspace();
-            obj.LiveAcceptLate = false;
-            obj.LiveCaptureEnabled = false;
+            obj.KernelLogsLoaded = true;
         end
 
         function run = collectRunData(obj)
-            obj.finalizeLoggedSignals();
+            obj.loadKernelLoggedSignals();
 
             names = [ ...
                 "rt_time", "f_input", "error", "control_effort", ...
@@ -466,31 +421,83 @@ classdef AppModel < handle
             end
         end
 
-        function waitForRemainingPackets(obj)
-            % A gappy stitch can still end at StopTime. Wait until SDI or
-            % a merge is gap-free (~S/T samples), not merely t(end)≈S.
-            t0 = tic;
-            while toc(t0) < 8
-                obj.pumpLiveBuffers();
-                obj.adoptAllRicherLogs();
-                if obj.logLooksComplete()
-                    return;
+        function ensureKernelLogsLoaded(obj)
+            if ~obj.KernelLogsLoaded
+                obj.loadKernelLoggedSignals();
+            end
+        end
+
+        function tryImportFileLog(obj)
+            % Typical SLDRT / SLRT File Log import. Fails quietly if the
+            % plant does not use File Log or the function is absent.
+            modelName = char(obj.SimulationModelName);
+            try
+                if exist('slrealtime.fileLogImport', 'file')
+                    slrealtime.fileLogImport(modelName);
                 end
-                pause(0.02);
-                drawnow;
+            catch
+            end
+        end
+
+        function [t, y] = readKernelNamed(obj, wsName, sdiName)
+            candidates = {};
+            [t, y] = obj.readLogsoutNamed(wsName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)};
+            end
+            [t, y] = obj.readWorkspaceNamed(wsName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)};
+            end
+            [t, y] = obj.readSdiNamed(sdiName);
+            if ~isempty(y)
+                candidates{end+1} = {t(:), y(:)};
+            end
+            if ~strcmp(wsName, sdiName)
+                [t, y] = obj.readSdiNamed(wsName);
+                if ~isempty(y)
+                    candidates{end+1} = {t(:), y(:)};
+                end
+            end
+            [t, y] = obj.pickBestSeries(candidates);
+        end
+
+        function [bestT, bestY] = pickBestSeries(obj, candidates)
+            % Choose one complete kernel record. Do not merge chunks.
+            bestT = [];
+            bestY = [];
+            bestN = -1;
+            completeN = -1;
+            completeT = [];
+            completeY = [];
+            for i = 1:numel(candidates)
+                ti = candidates{i}{1};
+                yi = candidates{i}{2};
+                n = min(numel(ti), numel(yi));
+                if n < 2
+                    continue;
+                end
+                ti = ti(1:n);
+                yi = yi(1:n);
+                if obj.isCompleteSeries(ti, yi) && n > completeN
+                    completeN = n;
+                    completeT = ti;
+                    completeY = yi;
+                end
+                if n > bestN
+                    bestN = n;
+                    bestT = ti;
+                    bestY = yi;
+                end
+            end
+            if ~isempty(completeY)
+                bestT = completeT;
+                bestY = completeY;
             end
         end
 
         function n = expectedSampleCount(obj)
             n = max(2, round(obj.S / obj.T));
-        end
-
-        function tf = hasTimeGaps(obj, t)
-            tf = false;
-            if numel(t) < 2
-                return;
-            end
-            tf = any(diff(t(:)) > 1.5 * obj.T);
         end
 
         function tf = isCompleteSeries(obj, t, y)
@@ -509,112 +516,11 @@ classdef AppModel < handle
             if n < obj.expectedSampleCount() - 2
                 return;
             end
-            if obj.hasTimeGaps(t)
-                return;
-            end
             tf = true;
-        end
-
-        function tf = logLooksComplete(obj)
-            tf = obj.isCompleteSeries(obj.TimeBuffer, obj.PositionBuffer);
-        end
-
-        function adoptAllRicherLogs(obj)
-            obj.adoptRicherLog('TimeBuffer', 'PositionBuffer', 'LiveArmed', ...
-                'cart1_position', 'Cart1-Position');
-            obj.adoptRicherLog('ForcingTimeBuffer', 'ForcingBuffer', 'LiveArmedForcing', ...
-                'f_input', 'f_input');
-            obj.adoptRicherLog('ErrorTimeBuffer', 'ErrorBuffer', 'LiveArmedError', ...
-                'error', 'error');
-            obj.adoptRicherLog('EffortTimeBuffer', 'EffortBuffer', 'LiveArmedEffort', ...
-                'control_effort', 'control_effort');
-            obj.adoptAuxRicherLogs();
-        end
-
-        function adoptRicherLog(obj, tField, yField, armedField, wsName, sdiName)
-            candidates = {};
-            if ~isempty(obj.(yField))
-                candidates{end+1} = {obj.(tField)(:), obj.(yField)(:)}; %#ok<AGROW>
-            end
-            [t, y] = obj.readWorkspaceNamed(wsName);
-            if ~isempty(y)
-                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
-            end
-            [t, y] = obj.readSdiNamed(sdiName);
-            if ~isempty(y)
-                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
-            end
-            [bestT, bestY] = obj.pickOrMergeSeries(candidates);
-            if ~isempty(bestY)
-                obj.(tField) = bestT(:)';
-                obj.(yField) = bestY(:)';
-                obj.(armedField) = true;
-            end
-        end
-
-        function [bestT, bestY] = pickOrMergeSeries(obj, candidates)
-            bestT = [];
-            bestY = [];
-            valid = {};
-            completeT = [];
-            completeY = [];
-            completeN = -1;
-            for i = 1:numel(candidates)
-                ti = candidates{i}{1};
-                yi = candidates{i}{2};
-                n = min(numel(ti), numel(yi));
-                if n < 2
-                    continue;
-                end
-                ti = ti(1:n);
-                yi = yi(1:n);
-                if ~obj.looksLikeThisRun(ti, yi)
-                    continue;
-                end
-                valid{end+1} = {ti(:), yi(:)}; %#ok<AGROW>
-                if obj.isCompleteSeries(ti, yi) && n > completeN
-                    completeN = n;
-                    completeT = ti;
-                    completeY = yi;
-                end
-            end
-            if ~isempty(completeY)
-                bestT = completeT;
-                bestY = completeY;
-                return;
-            end
-            for i = 1:numel(valid)
-                [bestT, bestY] = obj.mergeByTime(bestT, bestY, ...
-                    valid{i}{1}, valid{i}{2});
-            end
-        end
-
-        function [t, y] = mergeByTime(obj, t1, y1, t2, y2)
-            if isempty(y2)
-                t = t1(:);
-                y = y1(:);
-                return;
-            end
-            if isempty(y1)
-                t = t2(:);
-                y = y2(:);
-                return;
-            end
-            n1 = min(numel(t1), numel(y1));
-            n2 = min(numel(t2), numel(y2));
-            tAll = [t1(1:n1); t2(1:n2)];
-            yAll = [y1(1:n1); y2(1:n2)];
-            [tAll, order] = sort(tAll);
-            yAll = yAll(order);
-            keep = [true; diff(tAll) > (obj.T / 2)];
-            t = tAll(keep);
-            y = yAll(keep);
         end
 
         function promoteLoggedSignalsToWorkspace(obj)
             % Labs plot(rt_time, cart1_position) and plot(rt_time, f_input).
-            % Same clock, same length, plant origin at t≈0.
-            obj.harmonizeStitchedLogs();
             if ~isempty(obj.TimeBuffer)
                 assignin('base', 'rt_time', obj.TimeBuffer(:));
             end
@@ -633,101 +539,23 @@ classdef AppModel < handle
             obj.promoteAuxLogs();
         end
 
-        function harmonizeStitchedLogs(obj)
-            n = min(numel(obj.TimeBuffer), numel(obj.PositionBuffer));
-            if n < 2
-                return;
-            end
-            t = obj.TimeBuffer(1:n);
-            y = obj.PositionBuffer(1:n);
-            [t, y] = obj.monotonicPlantClock(t, y);
-            obj.TimeBuffer = t(:)';
-            obj.PositionBuffer = y(:)';
-            if ~isempty(obj.ForcingBuffer) && ~isempty(obj.ForcingTimeBuffer)
-                obj.ForcingBuffer = obj.resampleOntoClock( ...
-                    obj.ForcingTimeBuffer, obj.ForcingBuffer, t);
-                obj.ForcingTimeBuffer = t(:)';
-            end
-            if ~isempty(obj.ErrorBuffer) && ~isempty(obj.ErrorTimeBuffer)
-                obj.ErrorBuffer = obj.resampleOntoClock( ...
-                    obj.ErrorTimeBuffer, obj.ErrorBuffer, t);
-                obj.ErrorTimeBuffer = t(:)';
-            end
-            if ~isempty(obj.EffortBuffer) && ~isempty(obj.EffortTimeBuffer)
-                obj.EffortBuffer = obj.resampleOntoClock( ...
-                    obj.EffortTimeBuffer, obj.EffortBuffer, t);
-                obj.EffortTimeBuffer = t(:)';
-            end
-        end
-
-        function yOut = resampleOntoClock(obj, tIn, yIn, tClock)
-            yOut = yIn;
-            if isempty(yIn) || isempty(tIn) || numel(tClock) < 2
-                return;
-            end
-            n = min(numel(tIn), numel(yIn));
-            tIn = tIn(1:n);
-            yIn = yIn(1:n);
-            if numel(yIn) == numel(tClock) && max(abs(tIn(:) - tClock(:))) <= obj.T
-                yOut = yIn(:)';
-                return;
-            end
-            if obj.hasTimeGaps(tIn)
-                yOut = yIn(:)';
-                return;
-            end
-            try
-                yOut = interp1(tIn(:), yIn(:), tClock(:), 'linear', 'extrap')';
-            catch
-                yOut = yIn(:)';
-            end
-        end
-
-        function [t, y] = monotonicPlantClock(obj, t, y)
-            t = t(:);
-            y = y(:);
-            n = min(numel(t), numel(y));
-            t = t(1:n);
-            y = y(1:n);
-            [t, order] = sort(t);
-            y = y(order);
-            keep = [true; diff(t) > (obj.T / 2)];
-            t = t(keep);
-            y = y(keep);
-        end
-
         function promoteAuxLogs(obj)
-            tClock = obj.TimeBuffer(:);
             names = obj.auxLogNames();
             for i = 1:numel(names)
                 wsName = names{i};
                 log = obj.AuxLogs.(wsName);
-                y = [];
-                if ~isempty(log.y) && ~isempty(log.t) ...
-                        && (log.t(end) - log.t(1)) >= 0.8 * obj.S
-                    y = obj.resampleOntoClock(log.t, log.y, tClock);
+                if ~isempty(log.y)
+                    assignin('base', wsName, log.y(:));
                 end
-                if numel(y) ~= numel(tClock)
-                    [tWs, yWs] = obj.readWorkspaceNamed(wsName);
-                    if numel(yWs) == numel(tClock)
-                        y = yWs(:);
-                    elseif ~isempty(tWs) && ~isempty(yWs) ...
-                            && (tWs(end) - tWs(1)) >= 0.8 * obj.S
-                        y = obj.resampleOntoClock(tWs, yWs, tClock);
-                    end
-                end
-                if numel(y) ~= numel(tClock)
-                    [tSdi, ySdi] = obj.readSdiNamed(obj.auxSdiName(wsName));
-                    if numel(ySdi) == numel(tClock)
-                        y = ySdi(:);
-                    elseif ~isempty(tSdi) && ~isempty(ySdi) ...
-                            && (tSdi(end) - tSdi(1)) >= 0.8 * obj.S
-                        y = obj.resampleOntoClock(tSdi, ySdi, tClock);
-                    end
-                end
-                if numel(y) == numel(tClock) && ~isempty(y)
-                    assignin('base', wsName, y(:));
-                end
+            end
+        end
+
+        function loadAuxLogs(obj)
+            names = obj.auxLogNames();
+            for i = 1:numel(names)
+                wsName = names{i};
+                [t, y] = obj.readKernelNamed(wsName, obj.auxSdiName(wsName));
+                obj.AuxLogs.(wsName) = struct('t', t(:)', 'y', y(:)');
             end
         end
 
@@ -735,7 +563,7 @@ classdef AppModel < handle
             names = obj.auxLogNames();
             logs = struct();
             for i = 1:numel(names)
-                logs.(names{i}) = struct('t', [], 'y', [], 'armed', false);
+                logs.(names{i}) = struct('t', [], 'y', []);
             end
             obj.AuxLogs = logs;
         end
@@ -756,85 +584,6 @@ classdef AppModel < handle
                     sdiName = 'Cart2-Velocity';
                 otherwise
                     sdiName = wsName;
-            end
-        end
-
-        function captureAuxLogs(obj)
-            names = obj.auxLogNames();
-            for i = 1:numel(names)
-                wsName = names{i};
-                log = obj.AuxLogs.(wsName);
-                [t, y] = obj.readWorkspaceNamed(wsName);
-                [log.t, log.y, log.armed] = obj.appendLiveSamples( ...
-                    log.t, log.y, log.armed, t, y);
-                if obj.LiveAcceptLate
-                    [t, y] = obj.readSdiNamed(obj.auxSdiName(wsName));
-                    [log.t, log.y, log.armed] = obj.appendLiveSamples( ...
-                        log.t, log.y, log.armed, t, y);
-                end
-                obj.AuxLogs.(wsName) = log;
-            end
-        end
-
-        function adoptAuxRicherLogs(obj)
-            names = obj.auxLogNames();
-            for i = 1:numel(names)
-                wsName = names{i};
-                log = obj.AuxLogs.(wsName);
-                log = obj.adoptRicherLogInto(log, wsName, obj.auxSdiName(wsName));
-                obj.AuxLogs.(wsName) = log;
-            end
-        end
-
-        function log = adoptRicherLogInto(obj, log, wsName, sdiName)
-            candidates = {};
-            if ~isempty(log.y)
-                candidates{end+1} = {log.t(:), log.y(:)}; %#ok<AGROW>
-            end
-            [t, y] = obj.readWorkspaceNamed(wsName);
-            if ~isempty(y)
-                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
-            end
-            [t, y] = obj.readSdiNamed(sdiName);
-            if ~isempty(y)
-                candidates{end+1} = {t(:), y(:)}; %#ok<AGROW>
-            end
-            [bestT, bestY] = obj.pickOrMergeSeries(candidates);
-            if ~isempty(bestY)
-                log.t = bestT(:)';
-                log.y = bestY(:)';
-                log.armed = true;
-            end
-        end
-
-        function captureLiveCart1Chunk(obj)
-            [t, y] = obj.readWorkspaceCart1();
-            obj.appendLiveChunk(t, y);
-            if obj.LiveAcceptLate
-                [t, y] = obj.readSdiNamed('Cart1-Position');
-                obj.appendLiveChunk(t, y);
-            end
-        end
-
-        function captureLiveFInputChunk(obj)
-            [t, y] = obj.readWorkspaceNamed('f_input');
-            obj.appendLiveForcingChunk(t, y);
-            if obj.LiveAcceptLate
-                [t, y] = obj.readSdiNamed('f_input');
-                obj.appendLiveForcingChunk(t, y);
-            end
-        end
-
-        function captureLiveNamedChunk(obj, wsName, sdiName, tField, yField, armedField)
-            [t, y] = obj.readWorkspaceNamed(wsName);
-            [obj.(tField), obj.(yField), obj.(armedField)] = ...
-                obj.appendLiveSamples(obj.(tField), obj.(yField), ...
-                obj.(armedField), t, y);
-            if obj.LiveAcceptLate
-                [t, y] = obj.readSdiNamed(sdiName);
-                [obj.(tField), obj.(yField), obj.(armedField)] = ...
-                    obj.appendLiveSamples(obj.(tField), obj.(yField), ...
-                    obj.(armedField), t, y);
             end
         end
 
@@ -880,6 +629,49 @@ classdef AppModel < handle
             end
         end
 
+        function [t, y] = readLogsoutNamed(obj, varName)
+            t = [];
+            y = [];
+            try
+                if ~evalin('base', "exist('logsout', 'var')")
+                    return;
+                end
+                ds = evalin('base', 'logsout');
+                [t, y] = obj.datasetSignalXY(ds, varName);
+            catch
+            end
+        end
+
+        function [t, y] = datasetSignalXY(obj, ds, nameFragment)
+            t = [];
+            y = [];
+            if isempty(ds)
+                return;
+            end
+            n = ds.numElements;
+            hit = [];
+            for i = 1:n
+                try
+                    el = ds.getElement(i);
+                catch
+                    el = ds{i};
+                end
+                name = char(el.Name);
+                if strcmpi(name, nameFragment)
+                    hit = el;
+                    break;
+                end
+                if isempty(hit) && contains(name, nameFragment, 'IgnoreCase', true)
+                    hit = el;
+                end
+            end
+            if isempty(hit)
+                return;
+            end
+            [t, y] = AppModel.signalValuesToXY(hit.Values);
+            t = obj.toSimSeconds(t);
+        end
+
         function names = workspaceLogNames(~)
             names = { ...
                 'rt_time', 'f_input', 'error', 'control_effort', ...
@@ -892,104 +684,23 @@ classdef AppModel < handle
             names = obj.workspaceLogNames();
             for i = 1:numel(names)
                 try
-                    assignin('base', names{i}, []);
-                catch
-                end
-                try
                     evalin('base', ['clear ' names{i}]);
                 catch
                 end
             end
-        end
-
-        function [t, y] = readWorkspaceCart1(obj)
-            [t, y] = obj.readWorkspaceNamed('cart1_position');
-        end
-
-        function id = currentSdiRunId(obj)
-            id = [];
             try
-                runObj = obj.currentSdiRun();
-                if ~isempty(runObj)
-                    id = runObj.id;
-                end
+                evalin('base', 'clear logsout');
             catch
-            end
-        end
-
-        function id = currentSdiRunIdUnfiltered(obj)
-            id = [];
-            try
-                runObj = obj.currentSdiRunUnfiltered();
-                if ~isempty(runObj)
-                    id = runObj.id;
-                end
-            catch
-            end
-        end
-
-        function ids = allSdiRunIds(~)
-            ids = [];
-            try
-                ids = Simulink.sdi.getAllRunIDs();
-            catch
-            end
-        end
-
-        function tf = isStaleSdiId(obj, id)
-            tf = false;
-            if isempty(id)
-                return;
-            end
-            if ~isempty(obj.StaleSdiRunId) && isequal(id, obj.StaleSdiRunId)
-                tf = true;
-                return;
-            end
-            if ~isempty(obj.StaleSdiRunIds)
-                tf = ismember(id, obj.StaleSdiRunIds);
             end
         end
 
         function snapshotStaleSdi(obj)
-            obj.StaleSdiRunId = obj.currentSdiRunIdUnfiltered();
             obj.StaleSdiRunIds = obj.allSdiRunIds();
-            [t, y, runObj] = obj.fetchSdiNamedUnfiltered('Cart1-Position');
-            obj.StaleSdiFingerprint = obj.makeSdiFingerprint(runObj, t, y);
         end
 
         function [t, y] = readSdiNamed(obj, nameFragment)
             t = [];
             y = [];
-            [tRaw, yRaw, runObj] = obj.fetchSdiNamed(nameFragment);
-            if isempty(yRaw)
-                return;
-            end
-            if obj.sdiRecordIsStale(runObj, tRaw, yRaw)
-                return;
-            end
-            obj.SdiFreshForThisRun = true;
-            t = tRaw;
-            y = yRaw;
-        end
-
-        function [t, y, runObj] = fetchSdiNamedUnfiltered(obj, nameFragment)
-            t = [];
-            y = [];
-            runObj = [];
-            try
-                runObj = obj.currentSdiRunUnfiltered();
-                if isempty(runObj)
-                    return;
-                end
-                [t, y] = obj.sdiSignalXY(runObj, nameFragment);
-            catch
-            end
-        end
-
-        function [t, y, runObj] = fetchSdiNamed(obj, nameFragment)
-            t = [];
-            y = [];
-            runObj = [];
             try
                 runObj = obj.currentSdiRun();
                 if isempty(runObj)
@@ -1006,6 +717,39 @@ classdef AppModel < handle
                 tClock = obj.sdiClockFromRun(runObj);
                 if numel(tClock) == numel(y) && numel(y) >= 2
                     t = tClock;
+                end
+            catch
+            end
+        end
+
+        function ids = allSdiRunIds(~)
+            ids = [];
+            try
+                ids = Simulink.sdi.getAllRunIDs();
+            catch
+            end
+        end
+
+        function runObj = currentSdiRun(obj)
+            runObj = [];
+            try
+                runObj = Simulink.sdi.getCurrentSimulationRun( ...
+                    char(obj.SimulationModelName));
+            catch
+            end
+            try
+                runIDs = obj.allSdiRunIds();
+                if isempty(runIDs)
+                    return;
+                end
+                newer = runIDs;
+                if ~isempty(obj.StaleSdiRunIds)
+                    newer = setdiff(runIDs, obj.StaleSdiRunIds, 'stable');
+                end
+                if ~isempty(newer)
+                    runObj = Simulink.sdi.getRun(newer(end));
+                elseif isempty(runObj)
+                    runObj = Simulink.sdi.getRun(runIDs(end));
                 end
             catch
             end
@@ -1067,153 +811,6 @@ classdef AppModel < handle
             if t(1) > max(100, 10 * obj.S)
                 t = t - t(1);
             end
-        end
-
-        function tf = sdiRecordIsStale(obj, runObj, t, y)
-            tf = true;
-            if isempty(y)
-                return;
-            end
-            if obj.matchesStaleLog(t, y)
-                return;
-            end
-            reused = isempty(runObj) || obj.isStaleSdiId(runObj.id);
-            if reused
-                % Same SDI run id as before Start, but this recording can
-                % still be a complete replacement for the current StopTime.
-                tf = ~obj.isCompleteSeries(t, y);
-                return;
-            end
-            tf = false;
-        end
-
-        function fp = makeSdiFingerprint(~, runObj, t, y)
-            fp = struct('n', 0, 'tEnd', NaN, 'yEnd', NaN, 'id', []);
-            if ~isempty(runObj)
-                fp.id = runObj.id;
-            end
-            if isempty(y)
-                return;
-            end
-            fp.n = numel(y);
-            fp.yEnd = y(end);
-            if ~isempty(t)
-                fp.tEnd = t(end);
-            end
-        end
-
-        function runObj = currentSdiRun(obj)
-            runObj = obj.currentSdiRunUnfiltered();
-        end
-
-        function runObj = currentSdiRunUnfiltered(obj)
-            runObj = [];
-            try
-                runObj = Simulink.sdi.getCurrentSimulationRun( ...
-                    char(obj.SimulationModelName));
-            catch
-            end
-            if ~isempty(runObj)
-                return;
-            end
-            try
-                runIDs = obj.allSdiRunIds();
-                if isempty(runIDs)
-                    return;
-                end
-                runObj = Simulink.sdi.getRun(runIDs(end));
-            catch
-            end
-        end
-
-        function appendLiveChunk(obj, t, y)
-            [obj.TimeBuffer, obj.PositionBuffer, obj.LiveArmed] = ...
-                obj.appendLiveSamples(obj.TimeBuffer, obj.PositionBuffer, ...
-                obj.LiveArmed, t, y);
-        end
-
-        function appendLiveForcingChunk(obj, t, y)
-            [obj.ForcingTimeBuffer, obj.ForcingBuffer, obj.LiveArmedForcing] = ...
-                obj.appendLiveSamples(obj.ForcingTimeBuffer, obj.ForcingBuffer, ...
-                obj.LiveArmedForcing, t, y);
-        end
-
-        function [timeBuf, yBuf, armed] = appendLiveSamples(obj, timeBuf, yBuf, armed, t, y)
-            if isempty(t) || isempty(y)
-                return;
-            end
-            t = t(:)';
-            y = y(:)';
-            n = min(numel(t), numel(y));
-            t = t(1:n);
-            y = y(1:n);
-            if obj.matchesStaleLog(t, y) || ~obj.looksLikeThisRun(t, y)
-                return;
-            end
-
-            % First packet of this run must be a short ExtMode dump near t=0.
-            % A leftover full series also starts at t=0; accepting it freezes
-            % the plot (new t <= old t(end)) or appends only past the old S.
-            if ~armed
-                maxStart = max(1.0, 4 * obj.LiveBufferSamples * obj.T);
-                maxFirstEnd = max(2.0, 8 * obj.LiveBufferSamples * obj.T);
-                if obj.LiveAcceptLate
-                    if t(1) <= maxStart || numel(t) <= 2 * obj.LiveBufferSamples
-                        armed = true;
-                        timeBuf = t;
-                        yBuf = y;
-                    end
-                elseif t(1) <= maxStart && t(end) <= maxFirstEnd
-                    armed = true;
-                    timeBuf = t;
-                    yBuf = y;
-                end
-                return;
-            end
-
-            covers = t(1) <= timeBuf(1) + obj.T ...
-                && t(end) >= timeBuf(end) - obj.T;
-            if (covers && numel(t) > numel(timeBuf)) ...
-                    || obj.isCompleteSeries(t, y)
-                timeBuf = t;
-                yBuf = y;
-                return;
-            end
-
-            [timeBuf, yBuf] = obj.mergeByTime(timeBuf(:), yBuf(:), t(:), y(:));
-            timeBuf = timeBuf(:)';
-            yBuf = yBuf(:)';
-        end
-
-        function tf = looksLikeThisRun(obj, t, y)
-            tf = false;
-            if isempty(t) || isempty(y)
-                return;
-            end
-            n = min(numel(t), numel(y));
-            t = t(1:n);
-            y = y(1:n);
-            if n < 2
-                return;
-            end
-            if obj.matchesStaleLog(t, y)
-                return;
-            end
-            if t(end) > obj.S + 1.0
-                return;
-            end
-            tf = true;
-        end
-
-        function tf = matchesStaleLog(obj, t, y)
-            tf = false;
-            fp = obj.StaleLogFingerprint;
-            if isempty(fp) || fp.n <= 0 || isempty(y)
-                return;
-            end
-            tf = numel(y) == fp.n ...
-                && isequaln(y(end), fp.yEnd) ...
-                && (isempty(t) || isequaln(t(end), fp.tEnd));
         end
     end
 

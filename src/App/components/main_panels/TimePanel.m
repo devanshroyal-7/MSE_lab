@@ -3,6 +3,10 @@ classdef TimePanel < handle
     % OverlayCheckBox is meant to draw the reference on the response plot.
     % updateReferencePlot / updateResponsePlot write cached line handles.
     %
+    % While a run is live, ResponsePlot (uiaxes) is hidden and a uitimescope
+    % occupies the same grid cell. Overlay / lock-X / lock-Y apply only to
+    % the post-run uiaxes. uitimescope requires MATLAB R2024a+.
+    %
     %{
     Example usage:
 
@@ -14,7 +18,9 @@ classdef TimePanel < handle
 
     properties
         MainLayoutGrid
+        ResponseHost          % 1x1 grid so live timescope and uiaxes share a cell
         ResponsePlot
+        ResponseTimeScope     % uitimescope during a run; empty afterward
         ReferencePlot
         OverlayCheckBox
         AutoscaleCheckBox
@@ -37,11 +43,18 @@ classdef TimePanel < handle
             obj.MainLayoutGrid.RowHeight = {'1x', 35, '1x'};
             obj.MainLayoutGrid.RowSpacing = 5;
 
-            % Response Section (Top)
-            obj.ResponsePlot = uiaxes(obj.MainLayoutGrid, ...
+            % Response Section (Top): host grid holds either uiaxes or uitimescope
+            obj.ResponseHost = uigridlayout(obj.MainLayoutGrid, [1, 1]);
+            obj.ResponseHost.Layout.Column = [1 2];
+            obj.ResponseHost.Layout.Row = 1;
+            obj.ResponseHost.Padding = [0 0 0 0];
+            obj.ResponseHost.RowHeight = {'1x'};
+            obj.ResponseHost.ColumnWidth = {'1x'};
+
+            obj.ResponsePlot = uiaxes(obj.ResponseHost, ...
                 "XGrid", "on", ...
                 "YGrid", "on");
-            obj.ResponsePlot.Layout.Column = [1 2];
+            obj.ResponsePlot.Layout.Column = 1;
             obj.ResponsePlot.Layout.Row = 1;
             
             padCheckbox = uigridlayout(obj.MainLayoutGrid, [1, 4]);
@@ -108,6 +121,7 @@ classdef TimePanel < handle
             title(obj.ReferencePlot, "Reference Plot", "FontWeight", "bold", "FontSize", 17);
             obj.ResponsePlot.TitleHorizontalAlignment = "left";
             obj.ReferencePlot.TitleHorizontalAlignment = "left";
+            obj.ResponseTimeScope = [];
         end
 
         function setReferenceQuantity(obj, quantity)
@@ -145,6 +159,67 @@ classdef TimePanel < handle
             end
             set(obj.RespLineHandle, 'XData', t, 'YData', y);
             obj.applyResponseXLim(t);
+        end
+
+        function showLiveTimeScope(obj, sampleRate)
+            % Hide Response uiaxes and put a fresh uitimescope in the same
+            % grid cell. The plant owner binds cart1_position to this handle.
+            if nargin < 2 || isempty(sampleRate) || ~(sampleRate > 0)
+                sampleRate = 1000;
+            end
+            obj.teardownTimeScope();
+            obj.ResponsePlot.Visible = 'off';
+
+            if exist('uitimescope', 'file') ~= 2
+                % uitimescope is R2024a+ (matlab.ui.scope.TimeScope in a
+                % uigridlayout). timescope (DSP System object) opens its own
+                % figure and cannot replace this uiaxes. Leave ResponsePlot on.
+                obj.ResponsePlot.Visible = 'on';
+                warning('TimePanel:NoUITimeScope', ...
+                    ['uitimescope is not available. Live Response view ', ...
+                     'needs MATLAB R2024a or newer.']);
+                return;
+            end
+
+            try
+                scope = uitimescope(obj.ResponseHost);
+            catch ME
+                obj.ResponsePlot.Visible = 'on';
+                warning('TimePanel:NoUITimeScope', ...
+                    'Could not create uitimescope: %s', ME.message);
+                return;
+            end
+            scope.Layout.Row = 1;
+            scope.Layout.Column = 1;
+            try
+                scope.Title = 'Response (live)';
+                scope.XLabel = 'Time (s)';
+                scope.YLabel = 'Displacement (mm)';
+                scope.XTimeSpan = max(0.1, obj.SimDuration);
+                scope.PlotType = 'line';
+            catch
+            end
+            try
+                scope.SampleRate = sampleRate;
+            catch
+            end
+            try
+                nBuf = max(5000, round(obj.SimDuration * sampleRate) + 100);
+                scope.BufferLength = nBuf;
+            catch
+            end
+            obj.ResponseTimeScope = scope;
+        end
+
+        function restoreResponseAxes(obj)
+            obj.teardownTimeScope();
+            if ~isempty(obj.ResponsePlot) && isvalid(obj.ResponsePlot)
+                obj.ResponsePlot.Visible = 'on';
+            end
+        end
+
+        function scope = getResponseTimeScope(obj)
+            scope = obj.ResponseTimeScope;
         end
 
         function applyOverlay(obj)
@@ -235,6 +310,20 @@ classdef TimePanel < handle
                 return;
             end
             ax.XLim = newLim;
+        end
+
+        function teardownTimeScope(obj)
+            scope = obj.ResponseTimeScope;
+            obj.ResponseTimeScope = [];
+            if isempty(scope)
+                return;
+            end
+            try
+                if isvalid(scope)
+                    delete(scope);
+                end
+            catch
+            end
         end
     end
 end
